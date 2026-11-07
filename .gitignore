@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Ambientes virtuais
+venv/
+.venv/
+env/
+
+# Variáveis sensíveis
+.env
+.env.*
+!.env.example
+
+# IDEs
+.vscode/
+.idea/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Testes
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
+
+# Banco de dados local
+*.db
+*.sqlite3
+
+# Arquivos temporários
+tmp/
+temp/
+
+# Arquivos gerados
+storage/photos/*
+storage/reports/*
+storage/exports/*
+
+# Manter estrutura das pastas de armazenamento
+!storage/photos/.gitkeep
+!storage/reports/.gitkeep
+!storage/exports/.gitkeep

@@ -1,0 +1,4 @@
+schema: 1
+project: APP-SEGURANCA-TRABALHO
+spec_dir: openspec/specs
+changes_dir: openspec/changes
