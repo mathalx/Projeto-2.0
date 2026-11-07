@@ -22,8 +22,8 @@ O projeto segue uma arquitetura modular baseada em responsabilidades:
 
 1. Clone o repositório:
 ```bash
-git clone URL_DO_REPOSITORIO
-cd APP-SEGURANCA-TRABALHO
+git clone https://github.com/mathalx/Projeto-2.0.git
+cd Projeto-2.0
 ```
 
 2. Crie e ative um ambiente virtual:
