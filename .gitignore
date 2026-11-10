@@ -34,6 +34,9 @@ htmlcov/
 *.db
 *.sqlite3
 
+# Dados locais de execução (recriados automaticamente pelo app)
+data/
+
 # Arquivos temporários
 tmp/
 temp/

@@ -1,0 +1,336 @@
+================================================================================
+ACNNORTE - HISTORICO CONSOLIDADO E UNIFICADO DE TODAS AS ALTERACOES DO PROJETO
+================================================================================
+Arquivo oficial de registro e rastreamento de modificacoes.
+Todas as informacoes foram consolidadas a partir das especificacoes estruturadas
+(OpenSpec) e relatorios tecnicos de mudancas, eliminando duplicidades e mantendo
+o registro integral de tudo o que foi planejado, desenvolvido e homologado.
+
+DIRETRIZ DE PROJETO:
+A partir desta versao, TODA E QUALQUER alteracao realizada no sistema deve ser
+obrigatoriamente documentada e catalogada nesta pasta (historico-alteracoes/).
+
+Data de Consolidacao: Novembro de 2026
+Versao da Aplicacao: 1.0 (Producao Homologada)
+Status Geral: 100% Funcional e Homologado (37 testes automatizados aprovados)
+================================================================================
+
+--------------------------------------------------------------------------------
+INDICE DOS MARCOS DE ALTERACOES
+--------------------------------------------------------------------------------
+1. MARCO 01 - ESTRUTURA TOPOLOGICA, GOVERNANCA E VERSIONAMENTO (OpenSpec 001)
+2. MARCO 02 - IDENTIDADE VISUAL E ESTRUTURA DE ATIVOS ESTATICOS (OpenSpec 002)
+3. MARCO 03 - AUTENTICACAO, SEGURANCA E GESTAO DE USUARIOS (Changes 01 a 07)
+4. MARCO 04 - PAINEL INICIAL (DASHBOARD) E NAVEGACAO GLOBAL (OpenSpec 003)
+5. MARCO 05 - GESTAO CADASTRA DE CLIENTES E HISTORICO (OpenSpec 003)
+6. MARCO 06 - VISTORIAS TECNICAS E CHECKLIST NORMATIVO WIZARD (OpenSpec 003)
+7. MARCO 07 - GESTAO DE FOTOGRAFIAS E EVIDENCIAS DE CAMPO (OpenSpec 003)
+8. MARCO 08 - MOTOR DE EMISSAO DE LAUDOS PDF E PLANILHAS EXCEL
+9. MARCO 09 - BACKEND EM NUVEM XANO, API GROUP E CLIENTE HTTP
+10. MARCO 10 - SUITE DE TESTES AUTOMATIZADOS E GARANTIA DA QUALIDADE (QA)
+11. MARCO 11 - PONTO DE ENTRADA RAIZ E CONFIGURACOES DE AMBIENTE
+12. MARCO 12 - RECURSOS AVANCADOS DE CAMPO: EQUIPAMENTOS, CLIMA, ASSINATURA E SCANNER
+
+================================================================================
+DETALHAMENTO INTEGRAL DE CADA ALTERACAO REALIZADA
+================================================================================
+
+--------------------------------------------------------------------------------
+1. MARCO 01 - ESTRUTURA TOPOLOGICA, GOVERNANCA E VERSIONAMENTO
+   (Referencia: OpenSpec Change 001)
+--------------------------------------------------------------------------------
+- Criacao da arquitetura de diretorios do projeto baseada em responsabilidades:
+  * src/: Codigo-fonte principal da aplicacao.
+  * storage/: Persistencia local temporaria e arquivos brutos.
+  * data/: Diretorio de armazenamento de arquivos JSON locais de negocio.
+  * assets/: Recursos visuais estaticos.
+  * docs/: Documentacao tecnica, arquitetura e manuais.
+  * tests/: Bateria de testes automatizados.
+  * openspec/: Especificacoes de mudancas controladas.
+- Configuracao de versionamento Git com modelo de branchs estruturado:
+  * Branchs: main (producao), develop (desenvolvimento ativo), feature/* e hotfix/*.
+  * Criacao do arquivo .gitignore contemplando isolamento de ambientes virtuais
+    (venv/, .venv/), caches de teste (.pytest_cache/, __pycache__/), credenciais
+    (.env) e arquivos de dados gerados.
+  * Criacao do arquivo .gitattributes para padronizacao de quebras de linha.
+  * Criacao do arquivo .env.example com definicao das variaveis de ambiente necessarias.
+  * Criacao do template institucional de Pull Request (.github/pull_request_template.md).
+  * Criacao do README.md raiz com instrucoes de instalacao, arquitetura e execucao.
+  * Criacao do manual de politicas Git em docs/versionamento/git-github.md.
+
+--------------------------------------------------------------------------------
+2. MARCO 02 - IDENTIDADE VISUAL E ESTRUTURA DE ATIVOS ESTATICOS
+   (Referencia: OpenSpec Change 002 e docs/acnnorte/05-recursos-visuais.md)
+--------------------------------------------------------------------------------
+- Definicao formal e implementacao da paleta cromatica oficial da marca ACNnorte:
+  * Verde Principal (ACN): #16834A - Botoes de acao primaria, titulos e destaques.
+  * Cinza Grafite (norte): #59636A - Subtitulos, labels e elementos secundarios.
+  * Verde Escuro: #216B45 - Estados de foco, hover e contraste.
+  * Verde Suave: #A5CFAF - Bordas sutis, tags e separadores.
+  * Verde Claro: #E8F2EA - Fundos de alertas positivos e cartoes de informacao.
+  * Cinza Claro: #F4F6F4 - Fundos neutros e paineis de dados.
+  * Preto Puro: #000000 - Textos corridos para garantia de contraste e acessibilidade.
+- Criacao e organizacao da pasta raiz assets/ subdividida por tipo de recurso:
+  * assets/images/: Armazenamento de banners, ilustracoes e fundos.
+  * assets/icons/: Armazenamento de icones avulsos em PNG, SVG e ICO.
+  * assets/styles/: Folhas de estilo CSS adicionais.
+  * assets/logo/: Variacoes oficiais do logotipo da marca ACNnorte.
+  * Inclusao de arquivos .gitkeep em cada subpasta para preservacao da arvore no Git.
+  * Documentacao de regras de utilizacao em assets/README.md.
+- Regra de estilizacao estrita: A grafia da marca mantem rigorosamente 'ACN' em
+  verde e 'norte' em cinza grafite, enquanto todos os demais textos sao em preto.
+
+--------------------------------------------------------------------------------
+3. MARCO 03 - AUTENTICACAO, SEGURANCA E GESTAO DE USUARIOS
+   (Referencia: docs/acnnorte/04-relatorio-mudancas.md - Changes 01 a 07)
+--------------------------------------------------------------------------------
+- Change 01: Concepcao da tela de login centralizada, profissional e minimalista,
+  contendo logotipo institucional estilizado da marca ACNnorte.
+- Change 02: Implementacao dos campos de usuario e senha com visibilidade oculta
+  por padrao (type="password") e tratamento de validacao para impedir envio vazio.
+- Change 03: Implantacao da persistencia de usuarios (data/users.json) com criptografia
+  robusta PBKDF2-HMAC-SHA256, 100.000 iteracoes e salt aleatorio de 16 bytes.
+  Usuarios iniciais criados e ativos:
+  * Ana.norte (Perfil: Administrador)
+  * anaju.mae (Perfil: Tecnico de Seguranca)
+  * anaju.pai (Perfil: Tecnico de Seguranca)
+- Change 04: Construcao da area administrativa restrita (src/views/admin_view.py)
+  exclusiva para administradores, contendo:
+  * Listagem geral de usuarios com status e perfil.
+  * Adicao de novos operadores com validacao de duplicidade.
+  * Alteracao de dados cadastrais e nivel de permissao.
+  * Bloqueio/inativacao de operadores sem exclusao historica.
+  * Reset e redefinicao controlada de senha.
+  * Exclusao com tela de confirmacao segura.
+- Change 05: Modulo de autoatendimento para troca de senha (src/views/profile_view.py),
+  exigindo a senha atual, validando a nova senha e confirmacao.
+- Change 06: Controle de ciclo de sessao em st.session_state, redirecionamento
+  automatico de rotas nao autenticadas e botao de logout que limpa a sessao.
+- Change 07: Estilizacao CSS avancada com media queries para adaptacao dinamica em
+  computadores, tablets e telas de smartphones.
+
+--------------------------------------------------------------------------------
+4. MARCO 04 - PAINEL INICIAL (DASHBOARD) E NAVEGACAO GLOBAL
+   (Referencia: OpenSpec Change 003 e docs/acnnorte/06-melhorias-experiencia.md)
+--------------------------------------------------------------------------------
+- Menu Lateral Inteligente (src/main.py e src/ui_components.py):
+  * Marcacao visual de pagina ativa (destaque em verde para a pagina selecionada).
+  * Icones e descricoes claras para cada area do sistema.
+  * Ocultacao dinamica de menus administrativos para usuarios comuns.
+  * Atalhos operacionais de acesso rapido fixos: 'Cadastrar cliente' e 'Nova visita'.
+  * Card do usuario logado exibindo nome e perfil de permissao.
+  * Indicador de sincronizacao de dados exibindo data/hora da ultima gravacao.
+- Navegacao Segura sem perda de estado:
+  * Criacao dos mecanismos navigate_to(), set_pending_state() e apply_pending_state()
+    em src/ui_components.py para transicao suave de telas e sub-abas sem perda de dados.
+- Painel Inicial Executivo (src/views/dashboard_main.py):
+  * Cards de metricas (KPIs): Total de Clientes, Visitas Realizadas, Visitas
+    Pendentes e Total de Fotografias Anexadas.
+  * Botoes de acao direta para as funcionalidades mais utilizadas.
+  * Painel de 'Ultimas Atividades' combinando vistorias e cadastros recentes em
+    ordem cronologica decrescente.
+
+--------------------------------------------------------------------------------
+5. MARCO 05 - GESTAO CADASTRAL DE CLIENTES E HISTORICO
+   (Referencia: src/views/clients_view.py e src/storage_manager.py)
+--------------------------------------------------------------------------------
+- Estrutura de dados persistente em data/clients.json com identificadores unicos UUID.
+- Sub-abas de navegacao em formato de pilulas:
+  * Lista de Clientes: visualizacao em tabela com barra de busca dinamica por texto
+    (filtro instantaneo por Nome Fantasia, Razao Social ou CNPJ).
+  * Cadastrar Cliente: formulario com validacao de campos essenciais (Razao Social,
+    CNPJ, Endereco, Responsavel Tecnico, Telefone e E-mail) e trava contra CNPJ duplicado.
+  * Consultar & Historico: ficha completa do cliente com apresentacao consolidada
+    de todas as vistorias tecnicas ja realizadas para aquela empresa.
+
+--------------------------------------------------------------------------------
+6. MARCO 06 - VISTORIAS TECNICAS E CHECKLIST NORMATIVO WIZARD
+   (Referencia: src/views/visits_view.py e src/form_template.py)
+--------------------------------------------------------------------------------
+- Preenchimento em formato Wizard (passo a passo) dividido em 5 etapas normativas
+  mais uma etapa de encerramento, reduzindo a fadiga do tecnico em campo:
+  1. Etapa 1 - NR-06 (Equipamentos de Protecao Individual):
+     * Fornecimento adequado de EPIs a todos os colaboradores.
+     * Uso correto e obrigatorio durante as atividades.
+     * Estado de conservacao e higienizacao dos equipamentos.
+     * Validade do Certificado de Aprovacao (CA).
+     * Parecer e observacoes tecnicas sobre EPIs.
+  2. Etapa 2 - NR-24 / NR-08 (Condicoes Gerais e Instalacoes):
+     * Instalacoes sanitarias limpas, funcionais e dimensionadas.
+     * Niveis de iluminamento nos postos de trabalho.
+     * Ventilacao e conforto termico ambiental.
+     * Organizacao, ordem e limpeza geral (Housekeeping).
+     * Parecer e observacoes tecnicas sobre condicoes gerais.
+  3. Etapa 3 - IT / NR-23 (Seguranca Contra Incendio e Panico):
+     * Extintores dentro da validade e com carga atualizada.
+     * Desobstrucao e livre acesso a extintores e hidrantes.
+     * Sinalizacao de emergencia e rotas de fuga visiveis e iluminadas.
+     * Saidas de emergencia desobstruidas e operacionais.
+     * Parecer e observacoes tecnicas sobre incendio.
+  4. Etapa 4 - NR-12 (Seguranca em Maquinas e Equipamentos):
+     * Presenca de protecoes fixas ou moveis intertravadas em zonas de perigo.
+     * Botoeiras de parada de emergencia operacionais e acessiveis.
+     * Instalacoes eletricas e quadros protegidos contra choques e curtos.
+     * Parecer e observacoes tecnicas sobre maquinario.
+  5. Etapa 5 - PGR / PCMSO / CIPA (Documentacao e Programas de SST):
+     * Programa de Gerenciamento de Riscos (PGR) elaborado e vigente.
+     * PCMSO e Atestados de Saude Ocupacional (ASOs) dos funcionarios em dia.
+     * CIPA constituida ou Designado formalizado e atuante.
+     * Registros de integracao e treinamentos periodicos de seguranca.
+     * Parecer e observacoes tecnicas sobre documentacao.
+  6. Etapa Final - Conclusao e Fechamento:
+     * Registro de recomendacoes tecnicas gerais, observacoes finais e situacao.
+- Recursos de Produtividade e Seguranca:
+  * Barra de progresso percentual calculada via visit_completion().
+  * Identificacao visual de campos mandatorios com asterisco (*).
+  * Opcao padrao '- Selecione -' para evitar marcacoes involuntarias.
+  * Salvamento automatico por callbacks a cada resposta informada.
+  * Botao 'Salvar agora' e navegacao bidirecional (Voltar / Avancar) sem perda de dados.
+  * Retomada automatica de rascunhos na primeira secao pendente (first_unanswered_section).
+  * Ciclo de vida da visita: status 'Rascunho' com transicao para 'Finalizada'
+    somente apos preenchimento obrigatorio e confirmacao expressa do operador.
+
+--------------------------------------------------------------------------------
+7. MARCO 07 - GESTAO DE FOTOGRAFIAS E EVIDENCIAS DE CAMPO
+   (Referencia: src/views/photos_view.py e src/storage_manager.py)
+--------------------------------------------------------------------------------
+- Area de envio dedicada em destaque com suporte a formatos PNG, JPG e JPEG.
+- Pre-visualizacao imediata da imagem selecionada antes do envio.
+- Campo de legenda tecnica obrigatoria para caracterizacao da foto.
+- Persistencia fisica organizada em data/photos/ e registro de metadados em data/visits.json.
+- Galeria visual agrupada por visita tecnica.
+- Mecanismo seguro de substituicao (replace_photo_in_visit): salva a nova foto,
+  atualiza o registro e apenas entao remove a foto antiga, prevenindo perda de arquivo.
+- Exclusao controlada com solicitacao de confirmacao visual em duas etapas.
+
+--------------------------------------------------------------------------------
+8. MARCO 08 - MOTOR DE EMISSAO DE LAUDOS PDF E PLANILHAS EXCEL
+   (Referencia: src/export_manager.py e src/views/reports_view.py)
+--------------------------------------------------------------------------------
+- Emissao de Relatorio Tecnico Executivo em PDF:
+  * Compilado via ReportLab em folha formato Letter com margens calibradas.
+  * Cabecalho oficial com titulacao nas cores institucionais ACNnorte.
+  * Bloco consolidado com dados do cliente (CNPJ, endereco, contato, data).
+  * Tabela estilizada contendo todas as perguntas normativas, respostas e observacoes.
+  * Anexo fotografico diagramado com miniaturas das imagens e legendas tecnicas.
+  * Geracao automatica do arquivo no diretorio data/exports/.
+- Exportacao Gerencial em Planilhas Excel (.xlsx):
+  * Gerada atraves do Pandas e OpenPyXL.
+  * Estruturacao com colunas claras para analise de dados e auditoria em BI.
+  * Download direto disponibilizado na propria tela do usuario.
+
+--------------------------------------------------------------------------------
+9. MARCO 09 - BACKEND EM NUVEM XANO, API GROUP E CLIENTE HTTP
+   (Referencia: xano/ e src/core/database/xano_client.py)
+--------------------------------------------------------------------------------
+- Especificacao formal do backend para transicao a nuvem com 0 erros de sintaxe:
+  * acnnorte.xs: Multidoc oficial em linguagem XanoScript contendo todo o workspace.
+  * workspace/: 25 definicoes individuais em formato .xs para aplicacao via CLI
+    (xano workspace push).
+  * schema.md, api.md e integracao.md: Documentacao tecnica completa do banco e APIs.
+- Modelo Relacional de Dados implementado:
+  * Tabela 'users': id, name, email (unico), password, role, status, timestamps.
+  * Tabela 'clients': id, name, cnpj (indexado), address, responsible, phone, email.
+  * Tabela 'visits': id, client_id, user_id, status (draft/finalized), form (JSON).
+  * Tabela 'photos': id, visit_id, file, caption, order, timestamp.
+- Barramento de 20 Endpoints REST:
+  * Autenticacao: POST /auth/login, POST /auth/signup, GET /auth/me, POST /auth/change_password.
+  * Usuarios: GET /users, PATCH /users/{id}/status.
+  * Clientes: GET /clients, POST /clients, GET /clients/{id}, PATCH /clients/{id}, DELETE /clients/{id}.
+  * Visitas: GET /visits, POST /visits, GET /visits/{id}, PATCH /visits/{id}, POST /visits/{id}/finalize.
+  * Fotografias: GET /photos, POST /photos, PATCH /photos/{id}, DELETE /photos/{id}.
+- Cliente HTTP Python em src/core/database/xano_client.py:
+  * Suporte a Bearer Token JWT e injecao automatica nos headers.
+  * Tratamento transparente de falhas com excecoes especializadas: XanoConfigurationError,
+    XanoConnectionError e XanoError.
+  * Metodo smoke_test() integrado ao cliente para validar comunicacao com endpoint /auth/me.
+- Integracao de Autenticacao em src/modules/authentication/auth_service.py:
+  * Validacao local previa de campos de login sem trafegar requisicao desnecessaria.
+  * Roteamento inteligente na tela de login: contas com '@' sao autenticadas no Xano;
+    usuarios sem '@' utilizam a base local PBKDF2.
+- Monitoramento em Tempo Real:
+  * Botao 'Testar conexao' integrado na barra lateral do Streamlit para diagnostico
+    imediato da API em nuvem.
+
+--------------------------------------------------------------------------------
+10. MARCO 10 - SUITE DE TESTES AUTOMATIZADOS E GARANTIA DA QUALIDADE (QA)
+    (Referencia: tests/ e pytest)
+--------------------------------------------------------------------------------
+- Bateria completa com 37 testes automatizados executados e 100% aprovados:
+  * tests/test_storage_manager.py (6 testes):
+    - Idempotencia da inicializacao do armazenamento local.
+    - Garantia de escrita exclusiva em formato JSON seguro.
+    - CRUD completo de clientes e tratamento de CNPJs repetidos.
+    - Fluxo completo de visitas tecnicas, fotos e metadados.
+    - Calculo de progresso e busca de secoes incompletas.
+    - Geracao fisica e integridade de arquivos PDF e Excel.
+  * tests/test_app_pages.py (11 testes):
+    - Renderizacao e carregamento sem erros da tela de login.
+    - Bloqueio de submissoes com campos em branco.
+    - Validacao do fluxo de login com e-mail direcionado ao Xano.
+    - Renderizacao autenticada de todas as 7 telas do sistema:
+      Painel Inicial, Clientes, Visitas Tecnicas, Fotografias,
+      Relatorios & Exportacao, Alterar Senha e Gerenciar Usuarios.
+    - Integridade da navegacao da barra lateral entre telas.
+  * tests/test_auth_service.py (10 testes):
+    - Rejeicao de e-mails vazios na camada de servico.
+    - Rejeicao de senhas vazias.
+    - Garantia de que formularios vazios nao instanciam cliente HTTP.
+    - Chamada ao endpoint /auth/login sem depender de token previo no .env.
+    - Fallback de papeis de usuario (role) aninhados.
+    - Rejeicao de respostas do servidor que nao contenham authToken valido.
+    - Conversao de credenciais invalidas em mensagens amigaveis.
+    - Captura e tratamento amigavel de falhas de rede.
+    - Tratamento de configuracoes ausentes na URL base.
+    - Rejeicao de respostas que nao sejam mapeamentos JSON validos.
+  * tests/test_xano_client.py (10 testes):
+    - Validacao de chamadas GET com retorno JSON e header Bearer.
+    - Validacao de chamadas POST com payload JSON.
+    - Disparo de excecoes controladas em codigos HTTP de erro.
+    - Tratamento do codigo 401 como endpoint acessivel no smoke test.
+    - Alerta de token rejeitado no smoke test.
+    - Deteccao e aviso de endpoints inexistentes (404).
+    - Deteccao de indisponibilidade de conexao de rede.
+    - Validacao de formato e presenca da URL base no .env.
+    - Tratamento gracioso de erros de configuracao no smoke test.
+    - Encapsulamento de falhas de transporte do requests.
+
+--------------------------------------------------------------------------------
+11. MARCO 11 - PONTO DE ENTRADA RAIZ E CONFIGURACOES DE AMBIENTE
+--------------------------------------------------------------------------------
+- Criacao do ponto de entrada principal main.py na raiz do projeto, permitindo
+  a execucao direta e intuitiva atraves do comando:
+  python -m streamlit run main.py
+- Preservacao da implementacao modular em src/main.py.
+- Integracao do carregamento de variaveis via python-dotenv lendo o arquivo .env
+  local de maneira isolada e segura.
+
+--------------------------------------------------------------------------------
+12. MARCO 12 - RECURSOS AVANCADOS DE CAMPO: EQUIPAMENTOS, CLIMA, ASSINATURA E SCANNER
+--------------------------------------------------------------------------------
+- Catalogo Oficial de Equipamentos (src/equipment_catalog.py):
+  * Base unica de instrumentos de medicao da ACN Norte para auditorias em campo:
+    Audiodosimetros, Bombas de Amostragem, Medidores/Monitores de Vibracao e Monitores IBUTG.
+  * Controle de datas de calibracao oficial, observacoes e persistencia complementar
+    em data/equipments.json.
+  * Padronizacao para integracao com laudos e nomenclatura automatica de fotos.
+- Servico de Integracao Climatica (src/weather_service.py):
+  * Captura em tempo real de temperatura e umidade relativa via API OpenWeather
+    (endpoint /weather) a partir das coordenadas de campo.
+  * Tratamento para coordenadas manuais e fallbacks em caso de bloqueio no navegador.
+- Componentes Interativos Customizados (src/components.py):
+  * Signature Pad: Componente canvas interativo com suporte a assinatura por toque,
+    stylus ou mouse, permitindo firma digital do responsavel na vistoria de campo.
+  * Geolocation Button: Disparador HTML5 para captura automatica de coordenadas GPS
+    (latitude e longitude) com precisao do dispositivo movel.
+- Scanner de EPI e Reconhecimento OCR (src/epi_scanner.py):
+  * Reconhecimento por visao computacional e OCR (Pillow e Pytesseract opcional)
+    para deteccao automatica de Certificado de Aprovacao (CA) e tipos de EPIs na foto.
+  * Sugestao inteligente no formulario da NR-06 para agilizar a checagem em campo.
+- Preparacao para o Formulario de Campo Unificado:
+  * Criacao da constante PAGE_FORM ('Formulario de Campo') em src/ui_components.py
+    e preparacao da rota no barramento de navegacao.
+
+================================================================================
+FIM DO REGISTRO CONSOLIDADO (HISTORICO-ALTERACOES)
+================================================================================

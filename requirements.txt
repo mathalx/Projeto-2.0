@@ -1,6 +1,11 @@
-streamlit>=1.32.0
+streamlit>=1.57.0
 pandas>=2.0.0
 openpyxl>=3.1.0
+reportlab>=4.0.0
 pydantic>=2.0.0
 pytest>=8.0.0
 python-dotenv>=1.0.0
+requests>=2.31.0
+Pillow>=10.0.0
+# OCR opcional do scanner de EPI (requer o executável Tesseract no sistema).
+pytesseract>=0.3.13
