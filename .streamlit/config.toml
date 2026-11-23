@@ -1,0 +1,38 @@
+# =============================================================================
+# ACNnorte — Tema claro oficial
+# =============================================================================
+# Esta é a fonte PRIMÁRIA do tema visual. O Streamlit aplica estas cores aos
+# componentes nativos (inputs, selectbox/dropdowns, date/time pickers, popovers,
+# botões, sidebar). Isso garante que os widgets BaseWeb — inclusive os que são
+# renderizados em portal (listas abertas, calendários) — permaneçam claros,
+# independentemente do modo claro/escuro do navegador do usuário.
+#
+# O CSS complementar em `src/ui/theme/styles.py` cobre apenas o que o tema
+# nativo não alcança (classes próprias .acn-*, botões do menu lateral e uma
+# camada de segurança para superfícies de widgets).
+# =============================================================================
+
+[theme]
+base = "light"
+primaryColor = "#16834A"              # Verde institucional (botões principais)
+backgroundColor = "#F3F4F6"           # Fundo principal da aplicação
+secondaryBackgroundColor = "#FFFFFF"  # Fundo dos campos/widgets (branco)
+textColor = "#111827"                 # Texto principal
+linkColor = "#16834A"
+borderColor = "#D1D5DB"               # Bordas de campos e cartões
+codeBackgroundColor = "#F3F4F6"       # Blocos de código
+codeTextColor = "#111827"
+dataframeBorderColor = "#D1D5DB"
+dataframeHeaderBackgroundColor = "#F3F4F6"
+showWidgetBorder = true
+showSidebarBorder = true
+baseRadius = "10px"
+buttonRadius = "10px"
+font = "sans-serif"
+
+[theme.sidebar]
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F3F4F6"
+textColor = "#111827"
+borderColor = "#E5E7EB"
+primaryColor = "#16834A"

@@ -1,0 +1,1 @@
+﻿"""Feature packages (extensões modulares)."""

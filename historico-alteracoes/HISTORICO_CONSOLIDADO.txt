@@ -1,0 +1,565 @@
+================================================================================
+ACNNORTE - HISTORICO CONSOLIDADO E UNIFICADO DE TODAS AS ALTERACOES DO PROJETO
+================================================================================
+Arquivo oficial de registro e rastreamento de modificacoes.
+Todas as informacoes foram consolidadas a partir das especificacoes estruturadas
+(OpenSpec) e relatorios tecnicos de mudancas, eliminando duplicidades e mantendo
+o registro integral de tudo o que foi planejado, desenvolvido e homologado.
+
+DIRETRIZ DE PROJETO:
+A partir desta versao, TODA E QUALQUER alteracao realizada no sistema deve ser
+obrigatoriamente documentada e catalogada nesta pasta (historico-alteracoes/).
+
+Data de Consolidacao: Novembro de 2026
+Versao da Aplicacao: 1.0 (Producao Homologada)
+Status Geral: 100% Funcional e Homologado (37 testes automatizados aprovados)
+================================================================================
+
+--------------------------------------------------------------------------------
+INDICE DOS MARCOS DE ALTERACOES
+--------------------------------------------------------------------------------
+1. MARCO 01 - ESTRUTURA TOPOLOGICA, GOVERNANCA E VERSIONAMENTO (OpenSpec 001)
+2. MARCO 02 - IDENTIDADE VISUAL E ESTRUTURA DE ATIVOS ESTATICOS (OpenSpec 002)
+3. MARCO 03 - AUTENTICACAO, SEGURANCA E GESTAO DE USUARIOS (Changes 01 a 07)
+4. MARCO 04 - PAINEL INICIAL (DASHBOARD) E NAVEGACAO GLOBAL (OpenSpec 003)
+5. MARCO 05 - GESTAO CADASTRA DE CLIENTES E HISTORICO (OpenSpec 003)
+6. MARCO 06 - VISTORIAS TECNICAS E CHECKLIST NORMATIVO WIZARD (OpenSpec 003)
+7. MARCO 07 - GESTAO DE FOTOGRAFIAS E EVIDENCIAS DE CAMPO (OpenSpec 003)
+8. MARCO 08 - MOTOR DE EMISSAO DE LAUDOS PDF E PLANILHAS EXCEL
+9. MARCO 09 - BACKEND EM NUVEM XANO, API GROUP E CLIENTE HTTP
+10. MARCO 10 - SUITE DE TESTES AUTOMATIZADOS E GARANTIA DA QUALIDADE (QA)
+11. MARCO 11 - PONTO DE ENTRADA RAIZ E CONFIGURACOES DE AMBIENTE
+12. MARCO 12 - ACESSO DIRETO A TELA PRINCIPAL (CHANGE 01 - REMOCAO DA TELA DE LOGIN)
+
+================================================================================
+DETALHAMENTO INTEGRAL DE CADA ALTERACAO REALIZADA
+================================================================================
+
+--------------------------------------------------------------------------------
+1. MARCO 01 - ESTRUTURA TOPOLOGICA, GOVERNANCA E VERSIONAMENTO
+   (Referencia: OpenSpec Change 001)
+--------------------------------------------------------------------------------
+- Criacao da arquitetura de diretorios do projeto baseada em responsabilidades:
+  * src/: Codigo-fonte principal da aplicacao.
+  * storage/: Persistencia local temporaria e arquivos brutos.
+  * data/: Diretorio de armazenamento de arquivos JSON locais de negocio.
+  * assets/: Recursos visuais estaticos.
+  * docs/: Documentacao tecnica, arquitetura e manuais.
+  * tests/: Bateria de testes automatizados.
+  * openspec/: Especificacoes de mudancas controladas.
+- Configuracao de versionamento Git com modelo de branchs estruturado:
+  * Branchs: main (producao), develop (desenvolvimento ativo), feature/* e hotfix/*.
+  * Criacao do arquivo .gitignore contemplando isolamento de ambientes virtuais
+    (venv/, .venv/), caches de teste (.pytest_cache/, __pycache__/), credenciais
+    (.env) e arquivos de dados gerados.
+  * Criacao do arquivo .gitattributes para padronizacao de quebras de linha.
+  * Criacao do arquivo .env.example com definicao das variaveis de ambiente necessarias.
+  * Criacao do template institucional de Pull Request (.github/pull_request_template.md).
+  * Criacao do README.md raiz com instrucoes de instalacao, arquitetura e execucao.
+  * Criacao do manual de politicas Git em docs/versionamento/git-github.md.
+
+--------------------------------------------------------------------------------
+2. MARCO 02 - IDENTIDADE VISUAL E ESTRUTURA DE ATIVOS ESTATICOS
+   (Referencia: OpenSpec Change 002 e docs/acnnorte/05-recursos-visuais.md)
+--------------------------------------------------------------------------------
+- Definicao formal e implementacao da paleta cromatica oficial da marca ACNnorte:
+  * Verde Principal (ACN): #16834A - Botoes de acao primaria, titulos e destaques.
+  * Cinza Grafite (norte): #59636A - Subtitulos, labels e elementos secundarios.
+  * Verde Escuro: #216B45 - Estados de foco, hover e contraste.
+  * Verde Suave: #A5CFAF - Bordas sutis, tags e separadores.
+  * Verde Claro: #E8F2EA - Fundos de alertas positivos e cartoes de informacao.
+  * Cinza Claro: #F4F6F4 - Fundos neutros e paineis de dados.
+  * Preto Puro: #000000 - Textos corridos para garantia de contraste e acessibilidade.
+- Criacao e organizacao da pasta raiz assets/ subdividida por tipo de recurso:
+  * assets/images/: Armazenamento de banners, ilustracoes e fundos.
+  * assets/icons/: Armazenamento de icones avulsos em PNG, SVG e ICO.
+  * assets/styles/: Folhas de estilo CSS adicionais.
+  * assets/logo/: Variacoes oficiais do logotipo da marca ACNnorte.
+  * Inclusao de arquivos .gitkeep em cada subpasta para preservacao da arvore no Git.
+  * Documentacao de regras de utilizacao em assets/README.md.
+- Regra de estilizacao estrita: A grafia da marca mantem rigorosamente 'ACN' em
+  verde e 'norte' em cinza grafite, enquanto todos os demais textos sao em preto.
+
+--------------------------------------------------------------------------------
+3. MARCO 03 - AUTENTICACAO, SEGURANCA E GESTAO DE USUARIOS
+   (Referencia: docs/acnnorte/04-relatorio-mudancas.md - Changes 01 a 07)
+--------------------------------------------------------------------------------
+- Change 01: Concepcao da tela de login centralizada, profissional e minimalista,
+  contendo logotipo institucional estilizado da marca ACNnorte.
+- Change 02: Implementacao dos campos de usuario e senha com visibilidade oculta
+  por padrao (type="password") e tratamento de validacao para impedir envio vazio.
+- Change 03: Implantacao da persistencia de usuarios (data/users.json) com criptografia
+  robusta PBKDF2-HMAC-SHA256, 100.000 iteracoes e salt aleatorio de 16 bytes.
+  Usuarios iniciais criados e ativos:
+  * Ana.norte (Perfil: Administrador)
+  * anaju.mae (Perfil: Tecnico de Seguranca)
+  * anaju.pai (Perfil: Tecnico de Seguranca)
+- Change 04: Construcao da area administrativa restrita (src/views/admin_view.py)
+  exclusiva para administradores, contendo:
+  * Listagem geral de usuarios com status e perfil.
+  * Adicao de novos operadores com validacao de duplicidade.
+  * Alteracao de dados cadastrais e nivel de permissao.
+  * Bloqueio/inativacao de operadores sem exclusao historica.
+  * Reset e redefinicao controlada de senha.
+  * Exclusao com tela de confirmacao segura.
+- Change 05: Modulo de autoatendimento para troca de senha (src/views/profile_view.py),
+  exigindo a senha atual, validando a nova senha e confirmacao.
+- Change 06: Controle de ciclo de sessao em st.session_state, redirecionamento
+  automatico de rotas nao autenticadas e botao de logout que limpa a sessao.
+- Change 07: Estilizacao CSS avancada com media queries para adaptacao dinamica em
+  computadores, tablets e telas de smartphones.
+
+--------------------------------------------------------------------------------
+4. MARCO 04 - PAINEL INICIAL (DASHBOARD) E NAVEGACAO GLOBAL
+   (Referencia: OpenSpec Change 003 e docs/acnnorte/06-melhorias-experiencia.md)
+--------------------------------------------------------------------------------
+- Menu Lateral Inteligente (src/main.py e src/ui_components.py):
+  * Marcacao visual de pagina ativa (destaque em verde para a pagina selecionada).
+  * Icones e descricoes claras para cada area do sistema.
+  * Ocultacao dinamica de menus administrativos para usuarios comuns.
+  * Atalhos operacionais de acesso rapido fixos: 'Cadastrar cliente' e 'Nova visita'.
+  * Card do usuario logado exibindo nome e perfil de permissao.
+  * Indicador de sincronizacao de dados exibindo data/hora da ultima gravacao.
+- Navegacao Segura sem perda de estado:
+  * Criacao dos mecanismos navigate_to(), set_pending_state() e apply_pending_state()
+    em src/ui_components.py para transicao suave de telas e sub-abas sem perda de dados.
+- Painel Inicial Executivo (src/views/dashboard_main.py):
+  * Cards de metricas (KPIs): Total de Clientes, Visitas Realizadas, Visitas
+    Pendentes e Total de Fotografias Anexadas.
+  * Botoes de acao direta para as funcionalidades mais utilizadas.
+  * Painel de 'Ultimas Atividades' combinando vistorias e cadastros recentes em
+    ordem cronologica decrescente.
+
+--------------------------------------------------------------------------------
+5. MARCO 05 - GESTAO CADASTRAL DE CLIENTES E HISTORICO
+   (Referencia: src/views/clients_view.py e src/storage_manager.py)
+--------------------------------------------------------------------------------
+- Estrutura de dados persistente em data/clients.json com identificadores unicos UUID.
+- Sub-abas de navegacao em formato de pilulas:
+  * Lista de Clientes: visualizacao em tabela com barra de busca dinamica por texto
+    (filtro instantaneo por Nome Fantasia, Razao Social ou CNPJ).
+  * Cadastrar Cliente: formulario com validacao de campos essenciais (Razao Social,
+    CNPJ, Endereco, Responsavel Tecnico, Telefone e E-mail) e trava contra CNPJ duplicado.
+  * Consultar & Historico: ficha completa do cliente com apresentacao consolidada
+    de todas as vistorias tecnicas ja realizadas para aquela empresa.
+
+--------------------------------------------------------------------------------
+6. MARCO 06 - VISTORIAS TECNICAS E CHECKLIST NORMATIVO WIZARD
+   (Referencia: src/views/visits_view.py e src/form_template.py)
+--------------------------------------------------------------------------------
+- Preenchimento em formato Wizard (passo a passo) dividido em 5 etapas normativas
+  mais uma etapa de encerramento, reduzindo a fadiga do tecnico em campo:
+  1. Etapa 1 - NR-06 (Equipamentos de Protecao Individual):
+     * Fornecimento adequado de EPIs a todos os colaboradores.
+     * Uso correto e obrigatorio durante as atividades.
+     * Estado de conservacao e higienizacao dos equipamentos.
+     * Validade do Certificado de Aprovacao (CA).
+     * Parecer e observacoes tecnicas sobre EPIs.
+  2. Etapa 2 - NR-24 / NR-08 (Condicoes Gerais e Instalacoes):
+     * Instalacoes sanitarias limpas, funcionais e dimensionadas.
+     * Niveis de iluminamento nos postos de trabalho.
+     * Ventilacao e conforto termico ambiental.
+     * Organizacao, ordem e limpeza geral (Housekeeping).
+     * Parecer e observacoes tecnicas sobre condicoes gerais.
+  3. Etapa 3 - IT / NR-23 (Seguranca Contra Incendio e Panico):
+     * Extintores dentro da validade e com carga atualizada.
+     * Desobstrucao e livre acesso a extintores e hidrantes.
+     * Sinalizacao de emergencia e rotas de fuga visiveis e iluminadas.
+     * Saidas de emergencia desobstruidas e operacionais.
+     * Parecer e observacoes tecnicas sobre incendio.
+  4. Etapa 4 - NR-12 (Seguranca em Maquinas e Equipamentos):
+     * Presenca de protecoes fixas ou moveis intertravadas em zonas de perigo.
+     * Botoeiras de parada de emergencia operacionais e acessiveis.
+     * Instalacoes eletricas e quadros protegidos contra choques e curtos.
+     * Parecer e observacoes tecnicas sobre maquinario.
+  5. Etapa 5 - PGR / PCMSO / CIPA (Documentacao e Programas de SST):
+     * Programa de Gerenciamento de Riscos (PGR) elaborado e vigente.
+     * PCMSO e Atestados de Saude Ocupacional (ASOs) dos funcionarios em dia.
+     * CIPA constituida ou Designado formalizado e atuante.
+     * Registros de integracao e treinamentos periodicos de seguranca.
+     * Parecer e observacoes tecnicas sobre documentacao.
+  6. Etapa Final - Conclusao e Fechamento:
+     * Registro de recomendacoes tecnicas gerais, observacoes finais e situacao.
+- Recursos de Produtividade e Seguranca:
+  * Barra de progresso percentual calculada via visit_completion().
+  * Identificacao visual de campos mandatorios com asterisco (*).
+  * Opcao padrao '- Selecione -' para evitar marcacoes involuntarias.
+  * Salvamento automatico por callbacks a cada resposta informada.
+  * Botao 'Salvar agora' e navegacao bidirecional (Voltar / Avancar) sem perda de dados.
+  * Retomada automatica de rascunhos na primeira secao pendente (first_unanswered_section).
+  * Ciclo de vida da visita: status 'Rascunho' com transicao para 'Finalizada'
+    somente apos preenchimento obrigatorio e confirmacao expressa do operador.
+
+--------------------------------------------------------------------------------
+7. MARCO 07 - GESTAO DE FOTOGRAFIAS E EVIDENCIAS DE CAMPO
+   (Referencia: src/views/photos_view.py e src/storage_manager.py)
+--------------------------------------------------------------------------------
+- Area de envio dedicada em destaque com suporte a formatos PNG, JPG e JPEG.
+- Pre-visualizacao imediata da imagem selecionada antes do envio.
+- Campo de legenda tecnica obrigatoria para caracterizacao da foto.
+- Persistencia fisica organizada em data/photos/ e registro de metadados em data/visits.json.
+- Galeria visual agrupada por visita tecnica.
+- Mecanismo seguro de substituicao (replace_photo_in_visit): salva a nova foto,
+  atualiza o registro e apenas entao remove a foto antiga, prevenindo perda de arquivo.
+- Exclusao controlada com solicitacao de confirmacao visual em duas etapas.
+
+--------------------------------------------------------------------------------
+8. MARCO 08 - MOTOR DE EMISSAO DE LAUDOS PDF E PLANILHAS EXCEL
+   (Referencia: src/export_manager.py e src/views/reports_view.py)
+--------------------------------------------------------------------------------
+- Emissao de Relatorio Tecnico Executivo em PDF:
+  * Compilado via ReportLab em folha formato Letter com margens calibradas.
+  * Cabecalho oficial com titulacao nas cores institucionais ACNnorte.
+  * Bloco consolidado com dados do cliente (CNPJ, endereco, contato, data).
+  * Tabela estilizada contendo todas as perguntas normativas, respostas e observacoes.
+  * Anexo fotografico diagramado com miniaturas das imagens e legendas tecnicas.
+  * Geracao automatica do arquivo no diretorio data/exports/.
+- Exportacao Gerencial em Planilhas Excel (.xlsx):
+  * Gerada atraves do Pandas e OpenPyXL.
+  * Estruturacao com colunas claras para analise de dados e auditoria em BI.
+  * Download direto disponibilizado na propria tela do usuario.
+
+--------------------------------------------------------------------------------
+9. MARCO 09 - BACKEND EM NUVEM XANO, API GROUP E CLIENTE HTTP
+   (Referencia: xano/ e src/core/database/xano_client.py)
+--------------------------------------------------------------------------------
+- Especificacao formal do backend para transicao a nuvem com 0 erros de sintaxe:
+  * acnnorte.xs: Multidoc oficial em linguagem XanoScript contendo todo o workspace.
+  * workspace/: 25 definicoes individuais em formato .xs para aplicacao via CLI
+    (xano workspace push).
+  * schema.md, api.md e integracao.md: Documentacao tecnica completa do banco e APIs.
+- Modelo Relacional de Dados implementado:
+  * Tabela 'users': id, name, email (unico), password, role, status, timestamps.
+  * Tabela 'clients': id, name, cnpj (indexado), address, responsible, phone, email.
+  * Tabela 'visits': id, client_id, user_id, status (draft/finalized), form (JSON).
+  * Tabela 'photos': id, visit_id, file, caption, order, timestamp.
+- Barramento de 20 Endpoints REST:
+  * Autenticacao: POST /auth/login, POST /auth/signup, GET /auth/me, POST /auth/change_password.
+  * Usuarios: GET /users, PATCH /users/{id}/status.
+  * Clientes: GET /clients, POST /clients, GET /clients/{id}, PATCH /clients/{id}, DELETE /clients/{id}.
+  * Visitas: GET /visits, POST /visits, GET /visits/{id}, PATCH /visits/{id}, POST /visits/{id}/finalize.
+  * Fotografias: GET /photos, POST /photos, PATCH /photos/{id}, DELETE /photos/{id}.
+- Cliente HTTP Python em src/core/database/xano_client.py:
+  * Suporte a Bearer Token JWT e injecao automatica nos headers.
+  * Tratamento transparente de falhas com excecoes especializadas: XanoConfigurationError,
+    XanoConnectionError e XanoError.
+  * Metodo smoke_test() integrado ao cliente para validar comunicacao com endpoint /auth/me.
+- Integracao de Autenticacao em src/modules/authentication/auth_service.py:
+  * Validacao local previa de campos de login sem trafegar requisicao desnecessaria.
+  * Roteamento inteligente na tela de login: contas com '@' sao autenticadas no Xano;
+    usuarios sem '@' utilizam a base local PBKDF2.
+- Monitoramento em Tempo Real:
+  * Botao 'Testar conexao' integrado na barra lateral do Streamlit para diagnostico
+    imediato da API em nuvem.
+
+--------------------------------------------------------------------------------
+10. MARCO 10 - SUITE DE TESTES AUTOMATIZADOS E GARANTIA DA QUALIDADE (QA)
+    (Referencia: tests/ e pytest)
+--------------------------------------------------------------------------------
+- Bateria completa com 37 testes automatizados executados e 100% aprovados:
+  * tests/test_storage_manager.py (6 testes):
+    - Idempotencia da inicializacao do armazenamento local.
+    - Garantia de escrita exclusiva em formato JSON seguro.
+    - CRUD completo de clientes e tratamento de CNPJs repetidos.
+    - Fluxo completo de visitas tecnicas, fotos e metadados.
+    - Calculo de progresso e busca de secoes incompletas.
+    - Geracao fisica e integridade de arquivos PDF e Excel.
+  * tests/test_app_pages.py (11 testes):
+    - Renderizacao e carregamento sem erros da tela de login.
+    - Bloqueio de submissoes com campos em branco.
+    - Validacao do fluxo de login com e-mail direcionado ao Xano.
+    - Renderizacao autenticada de todas as 7 telas do sistema:
+      Painel Inicial, Clientes, Visitas Tecnicas, Fotografias,
+      Relatorios & Exportacao, Alterar Senha e Gerenciar Usuarios.
+    - Integridade da navegacao da barra lateral entre telas.
+  * tests/test_auth_service.py (10 testes):
+    - Rejeicao de e-mails vazios na camada de servico.
+    - Rejeicao de senhas vazias.
+    - Garantia de que formularios vazios nao instanciam cliente HTTP.
+    - Chamada ao endpoint /auth/login sem depender de token previo no .env.
+    - Fallback de papeis de usuario (role) aninhados.
+    - Rejeicao de respostas do servidor que nao contenham authToken valido.
+    - Conversao de credenciais invalidas em mensagens amigaveis.
+    - Captura e tratamento amigavel de falhas de rede.
+    - Tratamento de configuracoes ausentes na URL base.
+    - Rejeicao de respostas que nao sejam mapeamentos JSON validos.
+  * tests/test_xano_client.py (10 testes):
+    - Validacao de chamadas GET com retorno JSON e header Bearer.
+    - Validacao de chamadas POST com payload JSON.
+    - Disparo de excecoes controladas em codigos HTTP de erro.
+    - Tratamento do codigo 401 como endpoint acessivel no smoke test.
+    - Alerta de token rejeitado no smoke test.
+    - Deteccao e aviso de endpoints inexistentes (404).
+    - Deteccao de indisponibilidade de conexao de rede.
+    - Validacao de formato e presenca da URL base no .env.
+    - Tratamento gracioso de erros de configuracao no smoke test.
+    - Encapsulamento de falhas de transporte do requests.
+
+--------------------------------------------------------------------------------
+11. MARCO 11 - PONTO DE ENTRADA RAIZ E CONFIGURACOES DE AMBIENTE
+--------------------------------------------------------------------------------
+- Criacao do ponto de entrada principal main.py na raiz do projeto, permitindo
+  a execucao direta e intuitiva atraves do comando:
+  python -m streamlit run main.py
+- Preservacao da implementacao modular em src/main.py.
+- Integracao do carregamento de variaveis via python-dotenv lendo o arquivo .env
+  local de maneira isolada e segura.
+
+--------------------------------------------------------------------------------
+12. MARCO 12 - ACESSO DIRETO A TELA PRINCIPAL (CHANGE 01 - REMOCAO DA TELA DE LOGIN)
+--------------------------------------------------------------------------------
+- Remocao da obrigatoriedade de autenticacao por senha ao abrir o aplicativo:
+  * O aplicativo agora abre diretamente na tela principal (Painel Inicial - PAGE_DASHBOARD),
+    permitindo acesso imediato aos formularios, clientes e visitas sem telas intermediarias.
+  * Inicializacao automatica da sessao com usuario padrao (Ana.norte) e perfil administrador.
+  * Preservacao integral dos modulos de autenticacao existentes (src/auth_manager.py,
+    src/modules/authentication/auth_service.py e src/views/login_view.py).
+  * Protecao de ambiente e rede: suporte a variavel REQUIRE_AUTH no arquivo .env
+    (padrao: false). Caso o sistema seja publicado na internet, definir REQUIRE_AUTH=true
+    restabelece a protecao por senha imediatamente para salvaguarda de dados sensiveis.
+  * Suporte a definicao do usuario padrao de campo via variavel DEFAULT_USERNAME.
+  * Bateria de testes expandida para 38 testes com validacao de acesso direto e modo protegido.
+
+--------------------------------------------------------------------------------
+13. MARCO 13 - CAPTURA AUTOMATICA DE TEMPERATURA (CHANGE 03)
+--------------------------------------------------------------------------------
+- Objetivo: facilitar o preenchimento da temperatura durante a visita, reduzindo
+  digitacao e erros, sem presumir que o celular possua sensor de temperatura ambiente.
+- Captura por localizacao:
+  * Componente de geolocalizacao (src/geolocation.py) solicita a localizacao ao
+    navegador somente apos autorizacao do usuario.
+  * Botao "Obter temperatura" consulta o clima externo e grava o resultado na visita.
+  * OpenWeather e usada quando OPENWEATHER_API_KEY esta configurada; a Open-Meteo
+    e o fallback gratuito automatico.
+  * Temperatura externa, umidade, origem, local e horario da consulta sao
+    exibidos e persistidos no registro weather da visita.
+  * O campo "Temperatura externa (C) - clima" e preenchido automaticamente e
+    permanece editavel.
+- Temperatura externa x interna:
+  * A interface mantem um campo separado e opcional para a temperatura interna
+    medida com termometro na empresa.
+  * A temperatura interna nunca e preenchida automaticamente; o celular nao e
+    tratado como sensor de temperatura ambiente.
+- Origem da informacao:
+  * A interface identifica claramente "Clima externo - OpenWeather",
+    "Clima externo - Open-Meteo" ou "Preenchimento manual".
+  * O valor meteorologico nao e apresentado como temperatura interna da empresa.
+- Fallbacks:
+  * GPS negado, falta de internet ou falha do servico nao bloqueiam a visita:
+    o tecnico pode informar temperatura, umidade, latitude e longitude manualmente.
+- Arquivos e testes:
+  * Servico em src/weather_service.py e persistencia em src/storage_manager.py.
+  * Secao de interface em src/views/visits_view.py.
+  * Testes em tests/test_weather_service.py e tests/test_visit_weather.py.
+  * Documentacao em docs/acnnorte/07-captura-temperatura.md e especificacao em
+    openspec/changes/004-captura-automatica-temperatura/.
+
+
+--------------------------------------------------------------------------------
+14. MARCO 14 - ASSINATURAS DIGITAIS OBRIGATORIAS (CHANGE 04)
+--------------------------------------------------------------------------------
+- Objetivo: registrar as assinaturas do Responsavel Tecnico e do Avaliador ao
+  final da visita, com nome e desenho, e inclui-las no relatorio PDF.
+- Assinatura:
+  * Componente src/signature_pad.py com canvas compativel com mouse e tela
+    sensivel ao toque.
+  * Nome e desenho para cada papel, com acoes de desfazer, limpar, visualizar e
+    desenhar novamente.
+  * Exportacao do traco em PNG e persistencia em data/photos/signatures/.
+- Regras da visita:
+  * As duas assinaturas sao obrigatorias para finalizar a visita.
+  * Rascunhos podem ser salvos sem assinaturas.
+  * Visitas finalizadas exibem as assinaturas em modo somente leitura.
+- PDF:
+  * As imagens, os nomes e os horarios sao incluidos no relatorio.
+  * A interface e o PDF informam que o registro nao possui validade juridica
+    automatica.
+- Arquivos e testes:
+  * Componente em src/signature_pad.py; persistencia em src/storage_manager.py;
+    interface em src/views/visits_view.py; PDF em src/export_manager.py.
+  * Testes em tests/test_visit_signatures.py.
+  * Documentacao em docs/acnnorte/08-assinaturas-digitais.md e especificacao em
+    openspec/changes/005-assinaturas-obrigatorias/.
+
+
+--------------------------------------------------------------------------------
+15. MARCO 15 - SELECAO DOS EQUIPAMENTOS DE DOSIMETRIA DE RUIDO (CHANGE 05)
+--------------------------------------------------------------------------------
+- Objetivo: substituir o preenchimento manual da identificacao do equipamento
+  por botoes selecionaveis, com destaque visual para as opcoes escolhidas,
+  vinculando cada identificacao a visita e a sua respectiva medicao.
+- Catalogo configuravel:
+  * Modulo src/equipment_catalog.py com opcoes organizadas por categoria,
+    marca e identificacao.
+  * Categoria Dosimetria de Ruido com apenas as opcoes fornecidas pela equipe:
+    Chrompack: 2386, 3440, 2319, 3558, 5981; Instrutherm: DOS-100X.
+  * Codigos fora do catalogo sao rejeitados, sem cadastrar opcoes nao fornecidas.
+- Selecao na visita:
+  * Nova etapa "Dosimetria de Ruido - equipamentos utilizados" em
+    src/views/visits_view.py.
+  * Botoes selecionaveis com destaque visual (verde quando selecionados),
+    selecao multipla, desmarcacao e persistencia imediata.
+  * Cada equipamento selecionado e associado a visita e a uma medicao vinculada
+    (measurement_id/equipment_code).
+- Persistencia e validacao:
+  * Campos aditivos equipment e measurements em src/storage_manager.py.
+  * Rascunhos podem ser salvos sem selecao; a finalizacao exige pelo menos um
+    equipamento.
+  * Visitas antigas continuam compativeis; registros legados em devices podem
+    ser interpretados quando correspondem ao catalogo.
+- Relatorios:
+  * PDF inclui a secao "Equipamentos Utilizados - Dosimetria de Ruido" com
+    categoria, marca, identificacao e medicao (src/export_manager.py).
+  * Planilha de visitas inclui equipamentos e medicoes vinculadas.
+- Arquivos e testes:
+  * Testes em tests/test_visit_equipment.py e cobertura em
+    tests/test_storage_manager.py.
+  * Validacao com streamlit.testing.v1.AppTest (renderizacao, clique/deselecao
+    e bloqueio de finalizacao sem equipamento).
+  * python -m pytest -q -> 64 passed.
+  * Documentacao em docs/acnnorte/09-selecao-equipamentos.md e especificacao em
+    openspec/changes/006-selecao-equipamentos/.
+
+
+================================================================================
+FIM DO REGISTRO CONSOLIDADO (HISTORICO-ALTERACOES)
+================================================================================
+
+
+
+--------------------------------------------------------------------------------
+16. MARCO 16 - IDENTIFICACAO DO FUNCIONARIO COM FOTO (CHANGE 02)
+--------------------------------------------------------------------------------
+- Objetivo: adicionar ao formulario de visita um campo de identificacao do
+  funcionario responsavel pelo preenchimento, com suporte a fotografia.
+- Estrutura de dados (src/storage_manager.py):
+  * Campo worker: dict com name, photo_path e photo_filename em cada visita.
+  * Campos de compatibilidade worker_name e worker_photo mantidos por legado.
+  * Funcao get_worker_photos_dir() cria data/photos/workers/ automaticamente.
+  * add_visit() aceita parametro worker_name para registrar o nome na criacao.
+  * update_visit() aceita parametro worker: dict para atualizar identificacao.
+  * save_worker_photo(visit_id, bytes, filename): salva imagem em disco,
+    remove foto anterior automaticamente e atualiza o registro da visita.
+  * remove_worker_photo(visit_id): remove arquivo do disco e limpa os campos.
+  * update_worker_info(visit_id, name): atualiza apenas o nome do funcionario.
+- Interface (src/views/visits_view.py):
+  * Funcao _render_worker_section() adicionada na ETAPA 4 do formulario.
+  * Layout de duas colunas: nome a esquerda, foto/upload a direita.
+  * Campo de texto com autosave via on_change para o nome do funcionario.
+  * Preview da foto salva exibido imediatamente ao abrir a etapa.
+  * File uploader para JPG/JPEG/PNG/WEBP com botao de confirmar salvamento.
+  * Botao de remocao com feedback imediato via set_flash e rerun.
+  * Modo somente leitura para visitas finalizadas (exibe sem permitir edicao).
+  * draft sincronizado com session_state via _collect_widgets e _build_draft.
+- Relatorios (src/export_manager.py):
+  * PDF inclui secao "Funcionario Avaliado" com nome e fotografia.
+  * Layout com tabela: texto a esquerda, foto 120x120 a direita.
+  * Fallback textual quando a foto nao existe ou nao e encontrada no disco.
+  * Planilha Excel de visitas inclui coluna Funcionario com o nome registrado.
+- Testes (tests/test_storage_manager.py):
+  * test_worker_photo_save_and_remove: salva, valida persistencia e remove.
+  * test_worker_photo_replaces_old_file: nova foto exclui a anterior do disco.
+  * test_update_worker_info: nome atualizado em worker.name e worker_name.
+  * test_worker_functions_reject_unknown_visit: tratamento de visita invalida.
+  * test_add_visit_stores_worker_name: parametro worker_name em add_visit.
+  * python -m pytest -q -> 74 passed (5 novos testes adicionados nesta CHANGE).
+- Arquivos modificados:
+  * src/storage_manager.py (funcoes de worker e diretorio workers/)
+  * src/views/visits_view.py (_render_worker_section, drafts, imports)
+  * src/export_manager.py (secao Funcionario Avaliado em PDF e Excel)
+  * tests/test_storage_manager.py (5 novos testes de worker)
+
+
+
+--------------------------------------------------------------------------------
+17. ATUALIZACAO 2026-11-14 - CAPTURA DE FOTOGRAFIA (UPLOAD + CAMERA)
+--------------------------------------------------------------------------------
+- Objetivo: permitir upload de imagem existente ou captura na hora em todo
+  campo de fotografia, com camera frontal e traseira.
+- Novo componente (src/components/photo_capture/):
+  * __init__.py exporta photo_input, clear_photo_input e helpers de validacao.
+  * photo_capture.py com photo_input(label, key, allow_upload=True,
+    allow_camera=True, default_camera="environment") -> bytes | None.
+  * camera_component.html com a marcacao do componente HTML/JS (Components v2).
+  * README.md com uso, permissoes, HTTPS e limitacoes.
+  * Abas "Carregar arquivo" e "Usar camera"; preview ao vivo, Capturar,
+    Refazer e Usar esta foto.
+  * Alternancia entre facingMode "user" (frontal) e "environment" (traseira).
+  * Fallback automatico para a frontal quando a traseira nao existe.
+  * enumerateDevices() permite escolher quando ha mais de uma camera.
+  * Compressao no cliente: maior lado <= 1600 px e JPEG qualidade ~0.85.
+  * track.stop() ao capturar, trocar de aba ou desmontar o componente.
+- Fallback e mensagens em portugues:
+  * Permissao negada, nenhuma camera, camera em uso e navegador sem suporte.
+  * HTTP fora de localhost exige HTTPS e oferece camera nativa/upload.
+- Validacao no servidor (Pillow):
+  * Aceita apenas JPG/PNG/WEBP e no maximo 10 MB.
+  * Corrige orientacao EXIF, redimensiona e converte tudo para JPEG normalizado.
+  * src/storage_manager.py usa validate_photo=True nos fluxos novos e mantem
+    compatibilidade com chamadas legadas.
+  * Fotos continuam em data/photos/workers/ e data/photos/, preservando
+    galeria, checklist, PDF e sincronizacao Xano best-effort.
+- Integracao:
+  * src/views/visits_view.py: foto do funcionario na ETAPA 4.
+  * src/views/photos_view.py: upload de evidencias e substituicao na galeria.
+  * st.session_state com chaves derivadas de key; clear_photo_input reinicia.
+- Dependencia:
+  * Nenhuma dependencia nova; Pillow>=10.0.0 ja constava em requirements.txt.
+- Testes:
+  * Novo tests/test_photo_capture.py (formatos, tamanho, EXIF, JPEG, None,
+    fallback de camera e persistencia via storage_manager).
+  * python -m pytest -q -> 104 passed.
+- Documentacao:
+  * docs/acnnorte/10-captura-fotografia.md.
+  * src/components/photo_capture/README.md.
+- Arquivos alterados:
+  * src/components/__init__.py (novo)
+  * src/components/photo_capture/__init__.py (novo)
+  * src/components/photo_capture/photo_capture.py (novo)
+  * src/components/photo_capture/camera_component.html (novo)
+  * src/components/photo_capture/README.md (novo)
+  * src/storage_manager.py
+  * src/views/visits_view.py
+  * src/views/photos_view.py
+  * requirements.txt
+  * tests/test_photo_capture.py (novo)
+  * docs/acnnorte/10-captura-fotografia.md (novo)
+
+
+
+--------------------------------------------------------------------------------
+18. ATUALIZACAO 2026-11-14 - MENU LATERAL RECOLHIVEL E REABRIVEL
+--------------------------------------------------------------------------------
+- Objetivo: fechar e reabrir o menu lateral em qualquer tela autenticada, no
+  celular e no desktop, preservando o estado durante reruns, navegacao e o
+  preenchimento do wizard de visitas.
+- Causa encontrada:
+  * O CSS nao ocultava stHeader, stToolbar nem os controles da sidebar; o
+    problema estava no botao flutuante antigo.
+  * O botao antigo procurava collapsedControl/stSidebarCollapsedControl,
+    seletores inexistentes no Streamlit 1.64.0 instalado. Nessa versao os
+    controles sao stExpandSidebarButton e stSidebarCollapseButton.
+  * O botao ficava sobre o controle nativo de reabrir e nao mantinha estado
+    nem fechava o menu no celular depois da troca de pagina.
+- Solucao:
+  * inject_sidebar_css() centraliza o CSS e mantem visiveis os controles
+    nativos do Streamlit 1.64.0 e os nomes legados, sem esconder o header.
+  * Botao real "Menu" fixo no topo da area principal, com 44x44 px minimos,
+    identidade ACNnorte e aria-label "Abrir menu"/"Fechar menu".
+  * Botao "Fechar menu" no topo da sidebar, visivel em telas pequenas.
+  * Ponte HTML/JS via st.iframe acessa window.parent.document e aciona os
+    controles nativos, com fallback para versoes anteriores.
+  * Token unico por renderizacao forca a reexecucao da ponte em cliques
+    repetidos de alternancia.
+  * st.session_state["sidebar_open"] guarda a intencao do usuario e
+    _sidebar_command executa uma unica ordem (toggle/close/close_if_mobile).
+  * initial_sidebar_state="auto" mantem o menu aberto no desktop e recolhido
+    no celular; abaixo de 768 px a sidebar abre sobreposta e navigate_to()
+    agenda o fechamento automatico apos a escolha da pagina.
+- Arquivos alterados:
+  * src/main.py
+  * src/ui_components.py
+  * tests/test_sidebar_toggle.py (novo)
+  * docs/acnnorte/06-melhorias-experiencia.md
+- Testes:
+  * python -m pytest -q -> 124 passed.
