@@ -28,7 +28,7 @@ def render_admin_view():
                     status = "✅ Ativo" if data.get("active", True) else "❌ Desativado"
                     st.markdown(status)
                 with cols[2]:
-                    st.markdown(f"<small style='color: #000000;'>Criado em: {data.get('created_at', 'N/D')}</small>", unsafe_allow_html=True)
+                    st.markdown(f"<small style='color: #4B5563;'>Criado em: {data.get('created_at', 'N/D')}</small>", unsafe_allow_html=True)
                 with cols[3]:
                     # Action buttons
                     col_act1, col_act2 = st.columns(2)

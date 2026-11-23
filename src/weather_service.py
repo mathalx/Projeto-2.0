@@ -1,9 +1,13 @@
-"""Captura automática de temperatura e umidade via OpenWeather.
+"""Captura automática de temperatura e umidade para as visitas técnicas.
 
 As coordenadas vêm do GPS do dispositivo (componente de geolocalização) e a
-leitura é feita no servidor com a chave ``OPENWEATHER_API_KEY``. O módulo
-também aceita coordenadas informadas manualmente, útil quando o navegador
-bloqueia a geolocalização.
+consulta é feita no servidor. A OpenWeather é usada quando
+``OPENWEATHER_API_KEY`` está configurada; a Open-Meteo (sem chave) é o
+fallback gratuito para que o recurso funcione em uma instalação nova.
+
+Importante: a temperatura retornada é a do **clima externo** na localização
+informada. Ela não substitui uma medição interna feita com termômetro no
+ambiente da empresa.
 """
 
 from __future__ import annotations
@@ -20,6 +24,10 @@ load_dotenv()
 OPENWEATHER_URL = "https://api.openweathermap.org/data/2.5/weather"
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 DEFAULT_TIMEOUT = 10
+
+SOURCE_OPENWEATHER = "OpenWeather"
+SOURCE_OPEN_METEO = "Open-Meteo"
+SOURCE_MANUAL = "Manual"
 
 # Descrições amigáveis dos códigos WMO retornados pela Open-Meteo.
 _WMO_DESCRIPTIONS = {
@@ -48,7 +56,7 @@ _WMO_DESCRIPTIONS = {
 
 
 class WeatherError(RuntimeError):
-    """Erro amigável de configuração ou comunicação com a OpenWeather."""
+    """Erro amigável de configuração ou comunicação com o serviço de clima."""
 
 
 @dataclass
@@ -60,12 +68,14 @@ class WeatherReading:
     latitude: float
     longitude: float
     capturado_em: str
+    fonte: str
 
     def to_dict(self) -> dict:
         return asdict(self)
 
 
 def get_api_key(api_key: str | None = None) -> str:
+    """Obtém a chave da OpenWeather do parâmetro, ambiente ou secrets."""
     key = (api_key or os.environ.get("OPENWEATHER_API_KEY", "")).strip()
     if not key:
         try:
@@ -80,7 +90,20 @@ def get_api_key(api_key: str | None = None) -> str:
 
 
 def is_configured(api_key: str | None = None) -> bool:
+    """Indica se a OpenWeather está configurada (fonte prioritária)."""
     return bool(get_api_key(api_key))
+
+
+def _validate_coordinates(latitude, longitude) -> tuple[float, float]:
+    try:
+        latitude = float(latitude)
+        longitude = float(longitude)
+    except (TypeError, ValueError) as exc:
+        raise WeatherError("Coordenadas de GPS inválidas.") from exc
+
+    if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+        raise WeatherError("Coordenadas de GPS fora do intervalo permitido.")
+    return latitude, longitude
 
 
 def capture_weather(
@@ -96,14 +119,7 @@ def capture_weather(
             "Chave da OpenWeather não configurada. Defina OPENWEATHER_API_KEY no arquivo .env."
         )
 
-    try:
-        latitude = float(latitude)
-        longitude = float(longitude)
-    except (TypeError, ValueError) as exc:
-        raise WeatherError("Coordenadas de GPS inválidas.") from exc
-
-    if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
-        raise WeatherError("Coordenadas de GPS fora do intervalo permitido.")
+    latitude, longitude = _validate_coordinates(latitude, longitude)
 
     params = {
         "lat": latitude,
@@ -150,39 +166,7 @@ def capture_weather(
         latitude=latitude,
         longitude=longitude,
         capturado_em=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    )
-
-
-def capture_weather_auto(
-    latitude: float,
-    longitude: float,
-    api_key: str | None = None,
-    timeout: int = DEFAULT_TIMEOUT,
-) -> WeatherReading:
-    """Captura o clima automaticamente, com fallback sem chave de API.
-
-    A OpenWeather continua sendo a fonte prioritária quando
-    ``OPENWEATHER_API_KEY`` está configurada. Se a chave não existir ou a
-    consulta falhar, a Open-Meteo é usada como alternativa gratuita para que a
-    captura por GPS funcione mesmo em uma instalação nova.
-    """
-    errors: list[str] = []
-
-    if is_configured(api_key):
-        try:
-            return capture_weather(latitude, longitude, api_key=api_key, timeout=timeout)
-        except WeatherError as exc:
-            errors.append(str(exc))
-
-    try:
-        return capture_open_meteo(latitude, longitude, timeout=timeout)
-    except WeatherError as exc:
-        errors.append(str(exc))
-
-    raise WeatherError(
-        errors[-1]
-        if errors
-        else "Não foi possível capturar a temperatura e a umidade agora."
+        fonte=SOURCE_OPENWEATHER,
     )
 
 
@@ -192,14 +176,7 @@ def capture_open_meteo(
     timeout: int = DEFAULT_TIMEOUT,
 ) -> WeatherReading:
     """Consulta a Open-Meteo (sem chave) para temperatura e umidade atuais."""
-    try:
-        latitude = float(latitude)
-        longitude = float(longitude)
-    except (TypeError, ValueError) as exc:
-        raise WeatherError("Coordenadas de GPS inválidas.") from exc
-
-    if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
-        raise WeatherError("Coordenadas de GPS fora do intervalo permitido.")
+    latitude, longitude = _validate_coordinates(latitude, longitude)
 
     params = {
         "latitude": latitude,
@@ -244,6 +221,34 @@ def capture_open_meteo(
         latitude=latitude,
         longitude=longitude,
         capturado_em=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        fonte=SOURCE_OPEN_METEO,
+    )
+
+
+def capture_weather_auto(
+    latitude: float,
+    longitude: float,
+    api_key: str | None = None,
+    timeout: int = DEFAULT_TIMEOUT,
+) -> WeatherReading:
+    """Captura o clima com a OpenWeather e recorre à Open-Meteo se necessário."""
+    errors: list[str] = []
+
+    if is_configured(api_key):
+        try:
+            return capture_weather(latitude, longitude, api_key=api_key, timeout=timeout)
+        except WeatherError as exc:
+            errors.append(str(exc))
+
+    try:
+        return capture_open_meteo(latitude, longitude, timeout=timeout)
+    except WeatherError as exc:
+        errors.append(str(exc))
+
+    raise WeatherError(
+        errors[-1]
+        if errors
+        else "Não foi possível capturar a temperatura e a umidade agora."
     )
 
 

@@ -20,7 +20,11 @@ Este documento consolida integralmente todas as alterações, especificações e
 - [Marco 09: Backend em Nuvem Xano, API Group e Cliente HTTP](#marco-09-backend-em-nuvem-xano-api-group-e-cliente-http)
 - [Marco 10: Suíte de Testes Automatizados e Garantia da Qualidade (QA)](#marco-10-suíte-de-testes-automatizados-e-garantia-da-qualidade-qa)
 - [Marco 11: Ponto de Entrada Raiz e Configurações de Ambiente](#marco-11-ponto-de-entrada-raiz-e-configurações-de-ambiente)
-- [Marco 12: Recursos Avançados de Campo (Equipamentos, Clima, Assinatura e Scanner EPI)](#marco-12-recursos-avançados-de-campo-equipamentos-clima-assinatura-e-scanner-epi)
+- [Marco 12: Acesso Direto à Tela Principal (CHANGE 01 — Remoção da Tela de Login)](#marco-12-acesso-direto-à-tela-principal-change-01--remoção-da-tela-de-login)
+- [Marco 13: Captura Automática de Temperatura (CHANGE 03)](#marco-13-captura-automática-de-temperatura-change-03)
+- [Marco 14: Assinaturas Digitais Obrigatórias (CHANGE 04)](#marco-14-assinaturas-digitais-obrigatórias-change-04)
+- [Atualização 2026-11-14: Captura de Fotografia (upload + câmera frontal/traseira)](#atualização-2026-11-14-captura-de-fotografia-upload--câmera-frontaltraseira)
+- [Atualização 2026-11-14: Menu lateral recolhível e reabrível](#atualização-2026-11-14-menu-lateral-recolhível-e-reabrível)
 
 ---
 
@@ -213,19 +217,171 @@ A plataforma conta com **37 testes automatizados** aprovados com **100% de suces
 
 ---
 
-## Marco 12: Recursos Avançados de Campo (Equipamentos, Clima, Assinatura e Scanner EPI)
+## Marco 12: Acesso Direto à Tela Principal (CHANGE 01 — Remoção da Tela de Login)
 
-* **Catálogo Oficial de Equipamentos de Medição ([`src/equipment_catalog.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/equipment_catalog.py))**:
-  * Base única e oficial de instrumentos da ACN Norte: Audiodosímetros, Bombas de Amostragem, Medidores de Vibração e Monitores IBUTG.
-  * Controle e exibição de datas de calibração vigentes, suporte a calibrações personalizadas via [`data/equipments.json`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/data/equipments.json) e padronização na nomenclatura de fotos e laudos técnicos.
-* **Serviço de Condições Climáticas em Campo ([`src/weather_service.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/weather_service.py))**:
-  * Integração com a API `OpenWeather` para aferição automática de temperatura e umidade relativa a partir das coordenadas GPS do avaliador.
-  * Suporte a inserção manual de coordenadas quando o navegador bloqueia a permissão de geolocalização.
-* **Componentes Interativos de Campo ([`src/components.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/components.py))**:
-  * **`signature_pad`**: Componente canvas HTML5 interativo permitindo coleta de assinatura digital do cliente ou técnico via toque na tela, caneta stylus ou mouse.
-  * **`geolocation_button`**: Componente para captura imediata da posição geográfica (latitude e longitude) com alta precisão via GPS.
-* **Scanner de EPI e Reconhecimento OCR ([`src/epi_scanner.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/epi_scanner.py))**:
-  * Extração automatizada de texto e número de Certificado de Aprovação (CA) a partir de fotografias de equipamentos com OCR (suporte a Pillow e Pytesseract).
-  * Sugestão assistida no checklist da NR-06 para agilizar a inspeção de conformidade.
-* **Preparação do Formulário de Campo**:
-  * Inclusão da rota `PAGE_FORM = "Formulário de Campo"` em [`src/ui_components.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/ui_components.py).
+* **Remoção da Obrigatoriedade de Senha**:
+  * Ao abrir o aplicativo, o usuário é direcionado imediatamente para a tela principal ([`Painel Inicial`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/views/dashboard_main.py)), permitindo iniciar visitas, cadastrar clientes e emitir laudos sem telas intermediárias.
+  * Inicialização automática de sessão com usuário padrão (`Ana.norte` - Administrador).
+* **Preservação de Módulos e Dados**:
+  * Todos os módulos de autenticação permanecem íntegros ([`src/auth_manager.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/auth_manager.py), [`src/modules/authentication/auth_service.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/modules/authentication/auth_service.py) e [`src/views/login_view.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/views/login_view.py)).
+  * Dados existentes em [`data/`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/data/) preservados sem modificações.
+* **Salvaguarda de Ambiente e Rede**:
+  * Suporte à variável `REQUIRE_AUTH=true` no arquivo [`.env`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/.env): caso o sistema seja publicado na internet, a proteção por senha pode ser reativada instantaneamente para proteger dados de clientes e funcionários.
+  * Suporte a `DEFAULT_USERNAME` para personalizar o nome do avaliador padrão.
+* **Validação e Testes**:
+  * Bateria de testes expandida para 38 testes automatizados, validando tanto o acesso direto quanto o modo protegido.
+
+---
+
+## Marco 13: Captura Automática de Temperatura (CHANGE 03)
+
+* **Objetivo**:
+  * Facilitar o preenchimento da temperatura durante a visita, reduzindo digitação e erros, sem presumir que o celular possua sensor de temperatura ambiente.
+* **Captura por localização**:
+  * Componente de geolocalização ([`src/geolocation.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/geolocation.py)) solicita a localização ao navegador somente após autorização do usuário.
+  * Botão **“Obter temperatura”** consulta o clima externo e grava o resultado na visita.
+  * A OpenWeather é usada quando `OPENWEATHER_API_KEY` está configurada; a Open-Meteo é o fallback gratuito automático.
+  * Temperatura externa, umidade, origem, local e horário da consulta são exibidos e persistidos no registro `weather` da visita.
+  * O campo **“Temperatura externa (°C) — clima”** é preenchido automaticamente e permanece editável.
+* **Temperatura externa x interna**:
+  * A interface mantém um campo separado e opcional para a **temperatura interna medida** com termômetro na empresa.
+  * A temperatura interna nunca é preenchida automaticamente; o celular não é tratado como sensor de temperatura ambiente.
+* **Origem da informação**:
+  * A interface identifica claramente `Clima externo • OpenWeather`, `Clima externo • Open-Meteo` ou `Preenchimento manual`.
+  * O valor meteorológico não é apresentado como temperatura interna da empresa.
+* **Fallbacks**:
+  * GPS negado, falta de internet ou falha do serviço não bloqueiam a visita: o técnico pode informar temperatura, umidade, latitude e longitude manualmente.
+* **Arquivos e testes**:
+  * Serviço em [`src/weather_service.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/weather_service.py) e persistência em [`src/storage_manager.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/storage_manager.py).
+  * Seção de interface em [`src/views/visits_view.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/views/visits_view.py).
+  * Testes em [`tests/test_weather_service.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/tests/test_weather_service.py) e [`tests/test_visit_weather.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/tests/test_visit_weather.py).
+  * Documentação detalhada em [`docs/acnnorte/07-captura-temperatura.md`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/docs/acnnorte/07-captura-temperatura.md) e especificação em [`openspec/changes/004-captura-automatica-temperatura/`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/openspec/changes/004-captura-automatica-temperatura/).
+
+---
+
+## Marco 14: Assinaturas Digitais Obrigatórias (CHANGE 04)
+
+* **Objetivo**:
+  * Registrar as assinaturas do **Responsável Técnico** e do **Avaliador** ao final da visita, com nome e desenho, e incluí-las no relatório PDF.
+* **Assinatura**:
+  * Componente [`src/signature_pad.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/signature_pad.py) com canvas compatível com mouse e tela sensível ao toque.
+  * Nome e desenho para cada papel, com ações de desfazer, limpar, visualizar e desenhar novamente.
+  * Exportação do traço em PNG e persistência em `data/photos/signatures/`.
+* **Regras da visita**:
+  * As duas assinaturas são obrigatórias para finalizar a visita.
+  * Rascunhos podem ser salvos sem assinaturas.
+  * Visitas finalizadas exibem as assinaturas em modo somente leitura.
+* **PDF**:
+  * As imagens, os nomes e os horários são incluídos no relatório.
+  * A interface e o PDF informam que o registro não possui validade jurídica automática.
+* **Arquivos e testes**:
+  * Componente em [`src/signature_pad.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/signature_pad.py); persistência em [`src/storage_manager.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/storage_manager.py); interface em [`src/views/visits_view.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/views/visits_view.py); PDF em [`src/export_manager.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/export_manager.py).
+  * Testes em [`tests/test_visit_signatures.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/tests/test_visit_signatures.py).
+  * Documentação em [`docs/acnnorte/08-assinaturas-digitais.md`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/docs/acnnorte/08-assinaturas-digitais.md) e especificação em [`openspec/changes/005-assinaturas-obrigatorias/`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/openspec/changes/005-assinaturas-obrigatorias/).
+
+---
+
+## Marco 15: Seleção dos Equipamentos de Dosimetria de Ruído (CHANGE 05)
+
+* **Objetivo**:
+  * Substituir o preenchimento manual da identificação do equipamento por botões selecionáveis, com destaque visual para as opções escolhidas, vinculando cada identificação à visita e à sua respectiva medição.
+* **Catálogo configurável**:
+  * Módulo [`src/equipment_catalog.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/equipment_catalog.py) com opções organizadas por categoria, marca e identificação.
+  * Categoria **Dosimetria de Ruído** com apenas as opções fornecidas pela equipe:
+    * Chrompack: 2386, 3440, 2319, 3558, 5981.
+    * Instrutherm: DOS-100X.
+  * Códigos fora do catálogo são rejeitados, evitando cadastro de opções não fornecidas.
+* **Seleção na visita**:
+  * Nova etapa **“Dosimetria de Ruído — equipamentos utilizados”** em [`src/views/visits_view.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/views/visits_view.py).
+  * Botões selecionáveis com destaque visual (verde quando selecionados), seleção múltipla, desmarcação e persistência imediata.
+  * Cada equipamento selecionado é associado à visita e a uma medição vinculada (`measurement_id`/`equipment_code`).
+* **Persistência e validação**:
+  * Campos aditivos `equipment` e `measurements` em [`src/storage_manager.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/storage_manager.py).
+  * Rascunhos podem ser salvos sem seleção; a finalização exige pelo menos um equipamento.
+  * Visitas antigas continuam compatíveis; registros legados em `devices` podem ser interpretados quando correspondem ao catálogo.
+* **Relatórios**:
+  * PDF inclui a seção **“Equipamentos Utilizados — Dosimetria de Ruído”** com categoria, marca, identificação e medição ([`src/export_manager.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/export_manager.py)).
+  * Planilha de visitas inclui equipamentos e medições vinculadas.
+* **Arquivos e testes**:
+  * Testes em [`tests/test_visit_equipment.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/tests/test_visit_equipment.py) e cobertura em [`tests/test_storage_manager.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/tests/test_storage_manager.py).
+  * Validação com `streamlit.testing.v1.AppTest` (renderização, clique/deseleção e bloqueio de finalização sem equipamento).
+  * `python -m pytest -q` → 64 passed.
+  * Documentação em [`docs/acnnorte/09-selecao-equipamentos.md`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/docs/acnnorte/09-selecao-equipamentos.md) e especificação em [`openspec/changes/006-selecao-equipamentos/`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/openspec/changes/006-selecao-equipamentos/).
+
+---
+
+## Atualização 2026-11-14: Captura de Fotografia (upload + câmera frontal/traseira)
+
+* **Data**: 2026-11-14.
+* **Objetivo**:
+  * Permitir upload de imagem existente ou captura na hora em todo campo de fotografia do sistema.
+  * Oferecer câmera frontal e traseira, com escolha de dispositivo quando houver mais de uma câmera.
+* **Novo componente**:
+  * Pasta [`src/components/photo_capture/`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/components/photo_capture/) com `__init__.py`, `photo_capture.py`, `camera_component.html` e `README.md`.
+  * Função pública `photo_input(label, key, allow_upload=True, allow_camera=True, default_camera="environment") -> bytes | None`.
+  * Componente HTML/JS via `streamlit.components.v1`/Components v2, seguindo o padrão de [`src/signature_pad.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/signature_pad.py) e [`src/geolocation.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/geolocation.py).
+  * Abas **📁 Carregar arquivo** e **📷 Usar câmera**, com pré-visualização ao vivo, **Capturar**, **Refazer** e **Usar esta foto**.
+  * Alternância `facingMode: "user"` (frontal) e `"environment"` (traseira); fallback automático para a frontal quando a traseira não existe.
+  * Lista de câmeras via `enumerateDevices()` quando há mais de um dispositivo de vídeo.
+  * Compressão no cliente: maior lado ≤ 1600 px e JPEG com qualidade ~0.85.
+  * Encerramento do stream com `track.stop()` ao capturar, trocar de aba ou desmontar.
+* **Fallback e mensagens**:
+  * Permissão negada, câmera inexistente, câmera em uso, contexto inseguro e navegador sem suporte exibem mensagens em português.
+  * Em HTTP fora de localhost, a interface exige HTTPS e oferece `st.camera_input` e `st.file_uploader` como alternativa.
+* **Validação no servidor**:
+  * Pillow valida JPG/PNG/WEBP, limite de 10 MB, corrige orientação EXIF e converte tudo para JPEG normalizado.
+  * [`src/storage_manager.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/storage_manager.py) recebe `validate_photo=True` nos fluxos novos e mantém compatibilidade com chamadas legadas.
+  * Fotos continuam em `data/photos/workers/` e `data/photos/`, preservando galeria, checklist, PDF e sincronização Xano best-effort.
+* **Integração**:
+  * [`src/views/visits_view.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/views/visits_view.py): fotografia do funcionário na Etapa 4.
+  * [`src/views/photos_view.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/views/photos_view.py): upload de evidências e substituição de imagem na galeria.
+  * Estado em `st.session_state` com chaves derivadas de `key`; `clear_photo_input(key)` reinicia o campo após salvar.
+* **Dependência**:
+  * Nenhuma dependência nova: `Pillow>=10.0.0` já constava em [`requirements.txt`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/requirements.txt).
+* **Testes**:
+  * Novo [`tests/test_photo_capture.py`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/tests/test_photo_capture.py) com validação de formatos, tamanho, EXIF, conversão JPEG, retorno `None`, fallback de câmera e persistência.
+  * `python -m pytest -q` → 104 passed.
+* **Documentação**:
+  * [`docs/acnnorte/10-captura-fotografia.md`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/docs/acnnorte/10-captura-fotografia.md).
+  * [`src/components/photo_capture/README.md`](file:///c:/Users/Matheus%20Alexandre/Desktop/projeto/src/components/photo_capture/README.md).
+* **Arquivos alterados**:
+  * `src/components/__init__.py` (novo)
+  * `src/components/photo_capture/__init__.py` (novo)
+  * `src/components/photo_capture/photo_capture.py` (novo)
+  * `src/components/photo_capture/camera_component.html` (novo)
+  * `src/components/photo_capture/README.md` (novo)
+  * `src/storage_manager.py`
+  * `src/views/visits_view.py`
+  * `src/views/photos_view.py`
+  * `requirements.txt`
+  * `tests/test_photo_capture.py` (novo)
+  * `docs/acnnorte/10-captura-fotografia.md` (novo)
+
+
+
+---
+
+## Atualização 2026-11-14: Menu lateral recolhível e reabrível
+
+* **Data**: 2026-11-14.
+* **Objetivo**:
+  * Permitir fechar e reabrir o menu lateral em qualquer tela autenticada, no celular e no desktop, sem perder o estado durante reruns, trocas de página ou preenchimento do wizard de visitas.
+* **Causa encontrada**:
+  * O CSS do sistema não ocultava `stHeader`, `stToolbar`, `stSidebarCollapsedControl` nem `collapsedControl`; o problema estava no botão flutuante antigo.
+  * O botão antigo usava os seletores `collapsedControl` e `stSidebarCollapsedControl`, que não existem no Streamlit 1.64.0 instalado. Nessa versão os controles são `stExpandSidebarButton` (reabrir) e `stSidebarCollapseButton` (fechar).
+  * O botão ficava em `top/left: 0.55rem`, sobre o controle nativo de reabrir, e não mantinha estado nem fechava o menu no celular após a navegação.
+* **Solução**:
+  * `inject_sidebar_css()` centraliza o CSS do menu e garante visibilidade dos controles nativos do Streamlit 1.64.0 e dos nomes legados, sem esconder o header/toolbar.
+  * Botão real `☰ Menu`, fixo no topo da área principal, com área de toque mínima de 44x44 px, cores ACNnorte e `aria-label` dinâmico (“Abrir menu”/“Fechar menu”).
+  * Botão `✕ Fechar menu` no topo da sidebar, visível também em telas pequenas.
+  * Ponte HTML/JS via `st.iframe` (substituto de `components.v1.html`) acessa `window.parent.document` e aciona `stExpandSidebarButton`/`stSidebarCollapseButton`, com fallback para versões antigas.
+  * Token único por renderização força o recarregamento da ponte, garantindo que cliques repetidos de alternância funcionem.
+  * `st.session_state["sidebar_open"]` guarda a intenção do usuário; `_sidebar_command` executa uma única ordem (`toggle`, `close` ou `close_if_mobile`).
+  * `initial_sidebar_state="auto"` mantém o menu aberto no desktop e recolhido no celular; abaixo de 768 px a sidebar abre sobreposta e `navigate_to()` agenda o fechamento automático após a escolha da página.
+* **Arquivos alterados**:
+  * `src/main.py` — `PAGE_CONFIG`, inicialização de `sidebar_open` e botão “✕ Fechar menu”.
+  * `src/ui_components.py` — `inject_sidebar_css`, `render_sidebar_toggle`, ponte JS e comandos de navegação.
+  * `tests/test_sidebar_toggle.py` (novo) — estado, CSS, ponte JS e renderização via `AppTest`.
+  * `docs/acnnorte/06-melhorias-experiencia.md` — seção “Menu lateral: abrir e fechar”.
+* **Testes**:
+  * `python -m pytest -q` -> 124 passed.

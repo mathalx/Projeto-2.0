@@ -154,7 +154,8 @@ def _render_new_client(clients: dict):
         c_phone = st.text_input("Telefone *", placeholder="Ex: (92) 99999-9999")
         c_email = st.text_input("E-mail *", placeholder="Ex: contato@empresa.com.br")
 
-        submitted = st.form_submit_button("Cadastrar cliente", type="primary", width="stretch")
+        with st.container(key="cadastrar_cliente_submit_wrap"):
+            submitted = st.form_submit_button("Cadastrar cliente", type="primary", width="stretch")
         if submitted:
             missing = []
             if not c_name.strip():

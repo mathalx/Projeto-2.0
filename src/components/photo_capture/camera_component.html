@@ -1,0 +1,83 @@
+<div class="acn-photo" id="acn-photo">
+  <div class="acn-photo-head">
+    <span class="acn-photo-label" id="pc-label">Fotografia</span>
+    <span class="acn-photo-status" id="pc-status">Nenhuma foto selecionada</span>
+  </div>
+
+  <div class="acn-tabs" role="tablist" aria-label="Formas de adicionar fotografia">
+    <button
+      id="pc-tab-upload"
+      class="acn-tab acn-tab-active"
+      type="button"
+      role="tab"
+      aria-selected="true"
+      aria-controls="pc-pane-upload"
+    >
+      📁 Carregar arquivo
+    </button>
+    <button
+      id="pc-tab-camera"
+      class="acn-tab"
+      type="button"
+      role="tab"
+      aria-selected="false"
+      aria-controls="pc-pane-camera"
+    >
+      📷 Usar câmera
+    </button>
+  </div>
+
+  <section id="pc-pane-upload" class="acn-pane" role="tabpanel" aria-labelledby="pc-tab-upload">
+    <label class="acn-drop" for="pc-file" id="pc-drop">
+      <span class="acn-drop-title">Toque para escolher uma imagem</span>
+      <span class="acn-drop-hint">JPG, PNG ou WEBP • até 10 MB</span>
+    </label>
+    <input id="pc-file" type="file" accept="image/jpeg,image/png,image/webp" hidden />
+  </section>
+
+  <section id="pc-pane-camera" class="acn-pane" role="tabpanel" aria-labelledby="pc-tab-camera" hidden>
+    <div class="acn-camera-toolbar">
+      <button id="pc-switch" type="button" class="acn-btn acn-btn-secondary">
+        🔄 Usar câmera frontal
+      </button>
+      <select id="pc-device" aria-label="Escolher câmera" hidden></select>
+    </div>
+
+    <div class="acn-stage">
+      <video id="pc-video" playsinline autoplay muted></video>
+      <img id="pc-snapshot" alt="Foto capturada pela câmera" hidden />
+      <div id="pc-hint" class="acn-hint">
+        Toque em “Abrir câmera” para iniciar a pré-visualização.
+      </div>
+    </div>
+
+    <div class="acn-camera-actions">
+      <button id="pc-start" type="button" class="acn-btn acn-btn-primary">
+        Abrir câmera
+      </button>
+      <button id="pc-capture" type="button" class="acn-btn acn-btn-primary" hidden>
+        📸 Capturar
+      </button>
+      <button id="pc-retake" type="button" class="acn-btn acn-btn-secondary" hidden>
+        ↩️ Refazer
+      </button>
+      <button id="pc-use-camera" type="button" class="acn-btn acn-btn-primary" hidden>
+        ✅ Usar esta foto
+      </button>
+    </div>
+  </section>
+
+  <div id="pc-message" class="acn-message" role="status" aria-live="polite"></div>
+
+  <div id="pc-preview-wrap" class="acn-preview" hidden>
+    <img id="pc-preview" alt="Pré-visualização da fotografia selecionada" />
+    <div class="acn-preview-actions">
+      <button id="pc-use" type="button" class="acn-btn acn-btn-primary">
+        ✅ Usar esta foto
+      </button>
+      <button id="pc-discard" type="button" class="acn-btn acn-btn-secondary">
+        Descartar
+      </button>
+    </div>
+  </div>
+</div>

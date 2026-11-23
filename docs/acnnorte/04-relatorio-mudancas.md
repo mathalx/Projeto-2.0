@@ -11,7 +11,3 @@
 > As melhorias posteriores de navegação, formulários, painel, fotografias,
 > mensagens, design e desempenho estão documentadas em
 > `docs/acnnorte/06-melhorias-experiencia.md`.
->
-> As changes 08 a 12 (acesso direto, funcionário com foto, catálogo de
-> equipamentos, scanner de EPI, galeria do dia, assinaturas digitais e laudo
-> homologado) estão documentadas em `docs/acnnorte/07-formulario-campo.md`.

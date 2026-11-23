@@ -89,10 +89,65 @@ Design system centralizado em `src/ui_components.py`:
   evitar duplicidade.
 - Dados preservados durante a navegação por meio do estado da sessão.
 
+## Menu lateral: abrir e fechar
+
+O menu lateral pode ser recolhido e reaberto em qualquer tela autenticada
+(Painel Inicial, Clientes, Visitas Técnicas, Fotografias, Relatórios,
+Alterar Senha e Gerenciar Usuários), no celular e no desktop.
+
+### Causa encontrada
+
+- O CSS do sistema não ocultava `stHeader`, `stToolbar` nem o controle nativo;
+  o problema estava no botão flutuante antigo.
+- O botão antigo procurava `[data-testid="collapsedControl"]` e
+  `[data-testid="stSidebarCollapsedControl"]`, seletores que **não existem no
+  Streamlit 1.64.0** (versão instalada). Nessa versão o controle de reabrir é
+  `[data-testid="stExpandSidebarButton"]` e o de fechar é
+  `[data-testid="stSidebarCollapseButton"]`.
+- Além disso, o botão antigo ficava em `top/left: 0.55rem`, sobre o controle
+  nativo de reabrir, e não guardava estado nem fechava o menu no celular após
+  a troca de página.
+
+### Solução
+
+- **Controles nativos preservados:** `inject_sidebar_css()` mantém
+  `stHeader`, `stToolbar`, `stExpandSidebarButton` e `stSidebarCollapseButton`
+  visíveis, com `pointer-events` e foco. Nada do header é escondido.
+- **Botão “☰ Menu”** fixo no topo da área principal, com 44×44 px mínimos,
+  cores da identidade ACNnorte e `aria-label` dinâmico (“Abrir menu” ou
+  “Fechar menu”). É um `st.button` real, portanto sobrevive a reruns e pode ser
+  testado com `AppTest`.
+- **Botão “✕ Fechar menu”** no topo da sidebar, sempre visível
+  (especialmente útil em telas pequenas).
+- **Ponte HTML/JS** via `st.iframe` (substituto atual de
+  `streamlit.components.v1.html`): acessa `window.parent.document` e clica no
+  controle nativo com tolerância aos testids do Streamlit 1.64.0 e aos nomes
+  legados. Um token único por renderização força a reexecução do comando em
+  cliques repetidos.
+- **Estado da sessão:** `st.session_state["sidebar_open"]` guarda a intenção
+  do usuário; a ordem de execução fica em `_sidebar_command` e é consumida uma
+  única vez. O estado real da sidebar é preservado pelo próprio Streamlit
+  durante reruns e trocas de página.
+- **Mobile-first:** `initial_sidebar_state="auto"` mantém o menu aberto no
+  desktop e recolhido no celular. Abaixo de 768 px a sidebar nativa abre
+  sobreposta ao conteúdo; ao escolher uma página, `navigate_to()` agenda
+  `close_if_mobile` e a ponte fecha o menu automaticamente. Em desktop o
+  comando é ignorado e o estado escolhido é mantido.
+
+### Como usar
+
+1. Toque em **☰ Menu** (ou no controle nativo) para abrir.
+2. Toque em **✕ Fechar menu** (dentro da sidebar), no controle nativo ou
+   novamente em **☰ Menu** para fechar.
+3. No celular, escolher uma página no menu fecha a sidebar sozinha.
+
 ## Arquivos principais alterados
 
 - `src/main.py` — menu lateral, destaque da página e roteamento.
-- `src/ui_components.py` — design system, navegação, mensagens e indicadores.
+- `src/ui_components.py` — design system, navegação, mensagens, indicadores e
+  abertura/fechamento do menu lateral (`inject_sidebar_css`,
+  `render_sidebar_toggle`).
+- `tests/test_sidebar_toggle.py` — cobertura do estado, do CSS e da ponte JS.
 - `src/form_template.py` — obrigatoriedade dos campos e utilitários de progresso.
 - `src/views/dashboard_main.py` — indicadores, atalhos e atividades recentes.
 - `src/views/clients_view.py` — busca, validação, confirmação e navegação.

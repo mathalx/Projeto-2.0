@@ -29,7 +29,7 @@ INDICE DOS MARCOS DE ALTERACOES
 9. MARCO 09 - BACKEND EM NUVEM XANO, API GROUP E CLIENTE HTTP
 10. MARCO 10 - SUITE DE TESTES AUTOMATIZADOS E GARANTIA DA QUALIDADE (QA)
 11. MARCO 11 - PONTO DE ENTRADA RAIZ E CONFIGURACOES DE AMBIENTE
-12. MARCO 12 - RECURSOS AVANCADOS DE CAMPO: EQUIPAMENTOS, CLIMA, ASSINATURA E SCANNER
+12. MARCO 12 - ACESSO DIRETO A TELA PRINCIPAL (CHANGE 01 - REMOCAO DA TELA DE LOGIN)
 
 ================================================================================
 DETALHAMENTO INTEGRAL DE CADA ALTERACAO REALIZADA
@@ -306,31 +306,260 @@ DETALHAMENTO INTEGRAL DE CADA ALTERACAO REALIZADA
   local de maneira isolada e segura.
 
 --------------------------------------------------------------------------------
-12. MARCO 12 - RECURSOS AVANCADOS DE CAMPO: EQUIPAMENTOS, CLIMA, ASSINATURA E SCANNER
+12. MARCO 12 - ACESSO DIRETO A TELA PRINCIPAL (CHANGE 01 - REMOCAO DA TELA DE LOGIN)
 --------------------------------------------------------------------------------
-- Catalogo Oficial de Equipamentos (src/equipment_catalog.py):
-  * Base unica de instrumentos de medicao da ACN Norte para auditorias em campo:
-    Audiodosimetros, Bombas de Amostragem, Medidores/Monitores de Vibracao e Monitores IBUTG.
-  * Controle de datas de calibracao oficial, observacoes e persistencia complementar
-    em data/equipments.json.
-  * Padronizacao para integracao com laudos e nomenclatura automatica de fotos.
-- Servico de Integracao Climatica (src/weather_service.py):
-  * Captura em tempo real de temperatura e umidade relativa via API OpenWeather
-    (endpoint /weather) a partir das coordenadas de campo.
-  * Tratamento para coordenadas manuais e fallbacks em caso de bloqueio no navegador.
-- Componentes Interativos Customizados (src/components.py):
-  * Signature Pad: Componente canvas interativo com suporte a assinatura por toque,
-    stylus ou mouse, permitindo firma digital do responsavel na vistoria de campo.
-  * Geolocation Button: Disparador HTML5 para captura automatica de coordenadas GPS
-    (latitude e longitude) com precisao do dispositivo movel.
-- Scanner de EPI e Reconhecimento OCR (src/epi_scanner.py):
-  * Reconhecimento por visao computacional e OCR (Pillow e Pytesseract opcional)
-    para deteccao automatica de Certificado de Aprovacao (CA) e tipos de EPIs na foto.
-  * Sugestao inteligente no formulario da NR-06 para agilizar a checagem em campo.
-- Preparacao para o Formulario de Campo Unificado:
-  * Criacao da constante PAGE_FORM ('Formulario de Campo') em src/ui_components.py
-    e preparacao da rota no barramento de navegacao.
+- Remocao da obrigatoriedade de autenticacao por senha ao abrir o aplicativo:
+  * O aplicativo agora abre diretamente na tela principal (Painel Inicial - PAGE_DASHBOARD),
+    permitindo acesso imediato aos formularios, clientes e visitas sem telas intermediarias.
+  * Inicializacao automatica da sessao com usuario padrao (Ana.norte) e perfil administrador.
+  * Preservacao integral dos modulos de autenticacao existentes (src/auth_manager.py,
+    src/modules/authentication/auth_service.py e src/views/login_view.py).
+  * Protecao de ambiente e rede: suporte a variavel REQUIRE_AUTH no arquivo .env
+    (padrao: false). Caso o sistema seja publicado na internet, definir REQUIRE_AUTH=true
+    restabelece a protecao por senha imediatamente para salvaguarda de dados sensiveis.
+  * Suporte a definicao do usuario padrao de campo via variavel DEFAULT_USERNAME.
+  * Bateria de testes expandida para 38 testes com validacao de acesso direto e modo protegido.
+
+--------------------------------------------------------------------------------
+13. MARCO 13 - CAPTURA AUTOMATICA DE TEMPERATURA (CHANGE 03)
+--------------------------------------------------------------------------------
+- Objetivo: facilitar o preenchimento da temperatura durante a visita, reduzindo
+  digitacao e erros, sem presumir que o celular possua sensor de temperatura ambiente.
+- Captura por localizacao:
+  * Componente de geolocalizacao (src/geolocation.py) solicita a localizacao ao
+    navegador somente apos autorizacao do usuario.
+  * Botao "Obter temperatura" consulta o clima externo e grava o resultado na visita.
+  * OpenWeather e usada quando OPENWEATHER_API_KEY esta configurada; a Open-Meteo
+    e o fallback gratuito automatico.
+  * Temperatura externa, umidade, origem, local e horario da consulta sao
+    exibidos e persistidos no registro weather da visita.
+  * O campo "Temperatura externa (C) - clima" e preenchido automaticamente e
+    permanece editavel.
+- Temperatura externa x interna:
+  * A interface mantem um campo separado e opcional para a temperatura interna
+    medida com termometro na empresa.
+  * A temperatura interna nunca e preenchida automaticamente; o celular nao e
+    tratado como sensor de temperatura ambiente.
+- Origem da informacao:
+  * A interface identifica claramente "Clima externo - OpenWeather",
+    "Clima externo - Open-Meteo" ou "Preenchimento manual".
+  * O valor meteorologico nao e apresentado como temperatura interna da empresa.
+- Fallbacks:
+  * GPS negado, falta de internet ou falha do servico nao bloqueiam a visita:
+    o tecnico pode informar temperatura, umidade, latitude e longitude manualmente.
+- Arquivos e testes:
+  * Servico em src/weather_service.py e persistencia em src/storage_manager.py.
+  * Secao de interface em src/views/visits_view.py.
+  * Testes em tests/test_weather_service.py e tests/test_visit_weather.py.
+  * Documentacao em docs/acnnorte/07-captura-temperatura.md e especificacao em
+    openspec/changes/004-captura-automatica-temperatura/.
+
+
+--------------------------------------------------------------------------------
+14. MARCO 14 - ASSINATURAS DIGITAIS OBRIGATORIAS (CHANGE 04)
+--------------------------------------------------------------------------------
+- Objetivo: registrar as assinaturas do Responsavel Tecnico e do Avaliador ao
+  final da visita, com nome e desenho, e inclui-las no relatorio PDF.
+- Assinatura:
+  * Componente src/signature_pad.py com canvas compativel com mouse e tela
+    sensivel ao toque.
+  * Nome e desenho para cada papel, com acoes de desfazer, limpar, visualizar e
+    desenhar novamente.
+  * Exportacao do traco em PNG e persistencia em data/photos/signatures/.
+- Regras da visita:
+  * As duas assinaturas sao obrigatorias para finalizar a visita.
+  * Rascunhos podem ser salvos sem assinaturas.
+  * Visitas finalizadas exibem as assinaturas em modo somente leitura.
+- PDF:
+  * As imagens, os nomes e os horarios sao incluidos no relatorio.
+  * A interface e o PDF informam que o registro nao possui validade juridica
+    automatica.
+- Arquivos e testes:
+  * Componente em src/signature_pad.py; persistencia em src/storage_manager.py;
+    interface em src/views/visits_view.py; PDF em src/export_manager.py.
+  * Testes em tests/test_visit_signatures.py.
+  * Documentacao em docs/acnnorte/08-assinaturas-digitais.md e especificacao em
+    openspec/changes/005-assinaturas-obrigatorias/.
+
+
+--------------------------------------------------------------------------------
+15. MARCO 15 - SELECAO DOS EQUIPAMENTOS DE DOSIMETRIA DE RUIDO (CHANGE 05)
+--------------------------------------------------------------------------------
+- Objetivo: substituir o preenchimento manual da identificacao do equipamento
+  por botoes selecionaveis, com destaque visual para as opcoes escolhidas,
+  vinculando cada identificacao a visita e a sua respectiva medicao.
+- Catalogo configuravel:
+  * Modulo src/equipment_catalog.py com opcoes organizadas por categoria,
+    marca e identificacao.
+  * Categoria Dosimetria de Ruido com apenas as opcoes fornecidas pela equipe:
+    Chrompack: 2386, 3440, 2319, 3558, 5981; Instrutherm: DOS-100X.
+  * Codigos fora do catalogo sao rejeitados, sem cadastrar opcoes nao fornecidas.
+- Selecao na visita:
+  * Nova etapa "Dosimetria de Ruido - equipamentos utilizados" em
+    src/views/visits_view.py.
+  * Botoes selecionaveis com destaque visual (verde quando selecionados),
+    selecao multipla, desmarcacao e persistencia imediata.
+  * Cada equipamento selecionado e associado a visita e a uma medicao vinculada
+    (measurement_id/equipment_code).
+- Persistencia e validacao:
+  * Campos aditivos equipment e measurements em src/storage_manager.py.
+  * Rascunhos podem ser salvos sem selecao; a finalizacao exige pelo menos um
+    equipamento.
+  * Visitas antigas continuam compativeis; registros legados em devices podem
+    ser interpretados quando correspondem ao catalogo.
+- Relatorios:
+  * PDF inclui a secao "Equipamentos Utilizados - Dosimetria de Ruido" com
+    categoria, marca, identificacao e medicao (src/export_manager.py).
+  * Planilha de visitas inclui equipamentos e medicoes vinculadas.
+- Arquivos e testes:
+  * Testes em tests/test_visit_equipment.py e cobertura em
+    tests/test_storage_manager.py.
+  * Validacao com streamlit.testing.v1.AppTest (renderizacao, clique/deselecao
+    e bloqueio de finalizacao sem equipamento).
+  * python -m pytest -q -> 64 passed.
+  * Documentacao em docs/acnnorte/09-selecao-equipamentos.md e especificacao em
+    openspec/changes/006-selecao-equipamentos/.
+
 
 ================================================================================
 FIM DO REGISTRO CONSOLIDADO (HISTORICO-ALTERACOES)
 ================================================================================
+
+
+
+--------------------------------------------------------------------------------
+16. MARCO 16 - IDENTIFICACAO DO FUNCIONARIO COM FOTO (CHANGE 02)
+--------------------------------------------------------------------------------
+- Objetivo: adicionar ao formulario de visita um campo de identificacao do
+  funcionario responsavel pelo preenchimento, com suporte a fotografia.
+- Estrutura de dados (src/storage_manager.py):
+  * Campo worker: dict com name, photo_path e photo_filename em cada visita.
+  * Campos de compatibilidade worker_name e worker_photo mantidos por legado.
+  * Funcao get_worker_photos_dir() cria data/photos/workers/ automaticamente.
+  * add_visit() aceita parametro worker_name para registrar o nome na criacao.
+  * update_visit() aceita parametro worker: dict para atualizar identificacao.
+  * save_worker_photo(visit_id, bytes, filename): salva imagem em disco,
+    remove foto anterior automaticamente e atualiza o registro da visita.
+  * remove_worker_photo(visit_id): remove arquivo do disco e limpa os campos.
+  * update_worker_info(visit_id, name): atualiza apenas o nome do funcionario.
+- Interface (src/views/visits_view.py):
+  * Funcao _render_worker_section() adicionada na ETAPA 4 do formulario.
+  * Layout de duas colunas: nome a esquerda, foto/upload a direita.
+  * Campo de texto com autosave via on_change para o nome do funcionario.
+  * Preview da foto salva exibido imediatamente ao abrir a etapa.
+  * File uploader para JPG/JPEG/PNG/WEBP com botao de confirmar salvamento.
+  * Botao de remocao com feedback imediato via set_flash e rerun.
+  * Modo somente leitura para visitas finalizadas (exibe sem permitir edicao).
+  * draft sincronizado com session_state via _collect_widgets e _build_draft.
+- Relatorios (src/export_manager.py):
+  * PDF inclui secao "Funcionario Avaliado" com nome e fotografia.
+  * Layout com tabela: texto a esquerda, foto 120x120 a direita.
+  * Fallback textual quando a foto nao existe ou nao e encontrada no disco.
+  * Planilha Excel de visitas inclui coluna Funcionario com o nome registrado.
+- Testes (tests/test_storage_manager.py):
+  * test_worker_photo_save_and_remove: salva, valida persistencia e remove.
+  * test_worker_photo_replaces_old_file: nova foto exclui a anterior do disco.
+  * test_update_worker_info: nome atualizado em worker.name e worker_name.
+  * test_worker_functions_reject_unknown_visit: tratamento de visita invalida.
+  * test_add_visit_stores_worker_name: parametro worker_name em add_visit.
+  * python -m pytest -q -> 74 passed (5 novos testes adicionados nesta CHANGE).
+- Arquivos modificados:
+  * src/storage_manager.py (funcoes de worker e diretorio workers/)
+  * src/views/visits_view.py (_render_worker_section, drafts, imports)
+  * src/export_manager.py (secao Funcionario Avaliado em PDF e Excel)
+  * tests/test_storage_manager.py (5 novos testes de worker)
+
+
+
+--------------------------------------------------------------------------------
+17. ATUALIZACAO 2026-11-14 - CAPTURA DE FOTOGRAFIA (UPLOAD + CAMERA)
+--------------------------------------------------------------------------------
+- Objetivo: permitir upload de imagem existente ou captura na hora em todo
+  campo de fotografia, com camera frontal e traseira.
+- Novo componente (src/components/photo_capture/):
+  * __init__.py exporta photo_input, clear_photo_input e helpers de validacao.
+  * photo_capture.py com photo_input(label, key, allow_upload=True,
+    allow_camera=True, default_camera="environment") -> bytes | None.
+  * camera_component.html com a marcacao do componente HTML/JS (Components v2).
+  * README.md com uso, permissoes, HTTPS e limitacoes.
+  * Abas "Carregar arquivo" e "Usar camera"; preview ao vivo, Capturar,
+    Refazer e Usar esta foto.
+  * Alternancia entre facingMode "user" (frontal) e "environment" (traseira).
+  * Fallback automatico para a frontal quando a traseira nao existe.
+  * enumerateDevices() permite escolher quando ha mais de uma camera.
+  * Compressao no cliente: maior lado <= 1600 px e JPEG qualidade ~0.85.
+  * track.stop() ao capturar, trocar de aba ou desmontar o componente.
+- Fallback e mensagens em portugues:
+  * Permissao negada, nenhuma camera, camera em uso e navegador sem suporte.
+  * HTTP fora de localhost exige HTTPS e oferece camera nativa/upload.
+- Validacao no servidor (Pillow):
+  * Aceita apenas JPG/PNG/WEBP e no maximo 10 MB.
+  * Corrige orientacao EXIF, redimensiona e converte tudo para JPEG normalizado.
+  * src/storage_manager.py usa validate_photo=True nos fluxos novos e mantem
+    compatibilidade com chamadas legadas.
+  * Fotos continuam em data/photos/workers/ e data/photos/, preservando
+    galeria, checklist, PDF e sincronizacao Xano best-effort.
+- Integracao:
+  * src/views/visits_view.py: foto do funcionario na ETAPA 4.
+  * src/views/photos_view.py: upload de evidencias e substituicao na galeria.
+  * st.session_state com chaves derivadas de key; clear_photo_input reinicia.
+- Dependencia:
+  * Nenhuma dependencia nova; Pillow>=10.0.0 ja constava em requirements.txt.
+- Testes:
+  * Novo tests/test_photo_capture.py (formatos, tamanho, EXIF, JPEG, None,
+    fallback de camera e persistencia via storage_manager).
+  * python -m pytest -q -> 104 passed.
+- Documentacao:
+  * docs/acnnorte/10-captura-fotografia.md.
+  * src/components/photo_capture/README.md.
+- Arquivos alterados:
+  * src/components/__init__.py (novo)
+  * src/components/photo_capture/__init__.py (novo)
+  * src/components/photo_capture/photo_capture.py (novo)
+  * src/components/photo_capture/camera_component.html (novo)
+  * src/components/photo_capture/README.md (novo)
+  * src/storage_manager.py
+  * src/views/visits_view.py
+  * src/views/photos_view.py
+  * requirements.txt
+  * tests/test_photo_capture.py (novo)
+  * docs/acnnorte/10-captura-fotografia.md (novo)
+
+
+
+--------------------------------------------------------------------------------
+18. ATUALIZACAO 2026-11-14 - MENU LATERAL RECOLHIVEL E REABRIVEL
+--------------------------------------------------------------------------------
+- Objetivo: fechar e reabrir o menu lateral em qualquer tela autenticada, no
+  celular e no desktop, preservando o estado durante reruns, navegacao e o
+  preenchimento do wizard de visitas.
+- Causa encontrada:
+  * O CSS nao ocultava stHeader, stToolbar nem os controles da sidebar; o
+    problema estava no botao flutuante antigo.
+  * O botao antigo procurava collapsedControl/stSidebarCollapsedControl,
+    seletores inexistentes no Streamlit 1.64.0 instalado. Nessa versao os
+    controles sao stExpandSidebarButton e stSidebarCollapseButton.
+  * O botao ficava sobre o controle nativo de reabrir e nao mantinha estado
+    nem fechava o menu no celular depois da troca de pagina.
+- Solucao:
+  * inject_sidebar_css() centraliza o CSS e mantem visiveis os controles
+    nativos do Streamlit 1.64.0 e os nomes legados, sem esconder o header.
+  * Botao real "Menu" fixo no topo da area principal, com 44x44 px minimos,
+    identidade ACNnorte e aria-label "Abrir menu"/"Fechar menu".
+  * Botao "Fechar menu" no topo da sidebar, visivel em telas pequenas.
+  * Ponte HTML/JS via st.iframe acessa window.parent.document e aciona os
+    controles nativos, com fallback para versoes anteriores.
+  * Token unico por renderizacao forca a reexecucao da ponte em cliques
+    repetidos de alternancia.
+  * st.session_state["sidebar_open"] guarda a intencao do usuario e
+    _sidebar_command executa uma unica ordem (toggle/close/close_if_mobile).
+  * initial_sidebar_state="auto" mantem o menu aberto no desktop e recolhido
+    no celular; abaixo de 768 px a sidebar abre sobreposta e navigate_to()
+    agenda o fechamento automatico apos a escolha da pagina.
+- Arquivos alterados:
+  * src/main.py
+  * src/ui_components.py
+  * tests/test_sidebar_toggle.py (novo)
+  * docs/acnnorte/06-melhorias-experiencia.md
+- Testes:
+  * python -m pytest -q -> 124 passed.

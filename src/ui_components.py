@@ -1,22 +1,30 @@
 """Componentes visuais compartilhados e identidade visual do ACNnorte."""
 
+import base64
 import html
+import json
 import re
+import uuid
 from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
 
 # ---------------------------------------------------------------------------
-# Identidade visual (paleta oficial)
+# Identidade visual / tema claro (centralizado em src.ui.theme)
+#
+# As constantes continuam sendo exportadas por este módulo para manter
+# compatibilidade, mas a fonte de verdade é ``src/ui/theme/colors.py``.
 # ---------------------------------------------------------------------------
-COLOR_PRIMARY = "#16834A"       # Verde principal
-COLOR_DARK_GREEN = "#216B45"    # Verde escuro
-COLOR_SOFT_GREEN = "#A5CFAF"    # Verde suave
-COLOR_LIGHT_GREEN = "#E8F2EA"   # Verde claro
-COLOR_LIGHT_GRAY = "#F4F6F4"    # Cinza claro
-COLOR_GRAPHITE = "#59636A"      # Cinza grafite
-COLOR_BLACK = "#000000"         # Preto
+from src.ui.theme.colors import (  # noqa: E402
+    COLOR_BLACK,
+    COLOR_DARK_GREEN,
+    COLOR_GRAPHITE,
+    COLOR_LIGHT_GRAY,
+    COLOR_LIGHT_GREEN,
+    COLOR_PRIMARY,
+    COLOR_SOFT_GREEN,
+)
 
 # ---------------------------------------------------------------------------
 # Logotipo oficial (assets/logo/acnnorte_logo.svg)
@@ -37,7 +45,6 @@ LOGO_WIDTH_PRESETS = {
 # ---------------------------------------------------------------------------
 # Chaves de navegação (compartilhadas entre main, views e atalhos)
 # ---------------------------------------------------------------------------
-PAGE_FORM = "Formulário de Campo"
 PAGE_DASHBOARD = "Painel Inicial"
 PAGE_CLIENTS = "Clientes"
 PAGE_VISITS = "Visitas Técnicas"
@@ -47,13 +54,12 @@ PAGE_PROFILE = "Alterar Senha"
 PAGE_ADMIN = "Gerenciar Usuários"
 
 NAV_ITEMS = [
-    (PAGE_FORM, "📝", "Formulário principal de avaliação em campo"),
     (PAGE_DASHBOARD, "🏠", "Visão geral e indicadores"),
     (PAGE_CLIENTS, "👥", "Cadastro e consulta de empresas"),
-    (PAGE_VISITS, "📋", "Visitas e formulários técnicos"),
-    (PAGE_PHOTOS, "📷", "Fotografias das visitas e galeria do dia"),
+    (PAGE_VISITS, "🧾", "Visitas e formulários técnicos"),
+    (PAGE_PHOTOS, "📷", "Fotografias das visitas"),
     (PAGE_REPORTS, "📊", "Relatórios PDF e planilhas"),
-    (PAGE_PROFILE, "🔑", "Alterar sua senha"),
+    (PAGE_PROFILE, "🔐", "Alterar sua senha"),
     (PAGE_ADMIN, "⚙️", "Gestão de usuários (administrador)"),
 ]
 
@@ -69,11 +75,37 @@ VISITS_TABS = [VISITS_TAB_LIST, VISITS_TAB_NEW, VISITS_TAB_FILL]
 
 PHOTOS_TAB_ADD = "📷 Adicionar Fotografia"
 PHOTOS_TAB_GALLERY = "🖼️ Galeria da Visita"
-PHOTOS_TAB_TODAY = "📅 Galeria do Dia"
-PHOTOS_TABS = [PHOTOS_TAB_ADD, PHOTOS_TAB_GALLERY, PHOTOS_TAB_TODAY]
+PHOTOS_TABS = [PHOTOS_TAB_ADD, PHOTOS_TAB_GALLERY]
 
 
 PENDING_STATE_KEY = "_pending_state"
+
+# ---------------------------------------------------------------------------
+# Estado do menu lateral
+#
+# O Streamlit 1.64.0 guarda o estado aberto/fechado da sidebar no front-end
+# (não existe API Python para abri-la/fechá-la depois do primeiro carregamento).
+# Por isso mantemos no session_state apenas a *intenção* do usuário e uma
+# "ordem" de um único uso, executada por uma pequena ponte HTML/JS que clica
+# nos controles nativos. O estado real continua sobrevivendo a reruns porque
+# é preservado pelo próprio React/Streamlit no navegador.
+# ---------------------------------------------------------------------------
+SIDEBAR_OPEN_KEY = "sidebar_open"
+SIDEBAR_COMMAND_KEY = "_sidebar_command"
+SIDEBAR_COMMAND_TOGGLE = "toggle"
+SIDEBAR_COMMAND_CLOSE = "close"
+SIDEBAR_COMMAND_CLOSE_MOBILE = "close_if_mobile"
+SIDEBAR_MOBILE_BREAKPOINT_PX = 768
+
+
+def next_sidebar_render_token() -> str:
+    """Gera um token único para forçar o recarregamento da ponte JS.
+
+    Isso é essencial: se o HTML do iframe fosse idêntico entre dois reruns,
+    o navegador reaproveitaria o documento e o comando "toggle" seria
+    executado apenas na primeira vez (o segundo clique não faria nada).
+    """
+    return uuid.uuid4().hex
 
 
 def set_pending_state(**state):
@@ -91,10 +123,35 @@ def apply_pending_state():
             st.session_state[key] = value
 
 
+def request_sidebar_toggle():
+    """Registra o pedido de alternar o menu e atualiza a intenção da sessão."""
+    st.session_state[SIDEBAR_OPEN_KEY] = not st.session_state.get(
+        SIDEBAR_OPEN_KEY, True
+    )
+    st.session_state[SIDEBAR_COMMAND_KEY] = SIDEBAR_COMMAND_TOGGLE
+
+
+def request_sidebar_close():
+    """Registra o pedido de fechar o menu em qualquer tamanho de tela."""
+    st.session_state[SIDEBAR_OPEN_KEY] = False
+    st.session_state[SIDEBAR_COMMAND_KEY] = SIDEBAR_COMMAND_CLOSE
+
+
+def request_sidebar_close_on_navigation():
+    """Pede o fechamento automático apenas em telas pequenas (< 768 px).
+
+    O Python não conhece a largura do navegador; a decisão é tomada pela
+    ponte JS com ``matchMedia``. Em desktop o comando é ignorado, preservando
+    o estado escolhido pelo usuário.
+    """
+    st.session_state[SIDEBAR_COMMAND_KEY] = SIDEBAR_COMMAND_CLOSE_MOBILE
+
+
 def navigate_to(page: str, **extra_state):
     """Troca a página atual (e opcionalmente a aba interna) e recarrega a tela."""
     set_pending_state(**extra_state)
     st.session_state["current_page"] = page
+    request_sidebar_close_on_navigation()
     st.rerun()
 
 
@@ -105,7 +162,7 @@ def record_sync():
 
 @st.cache_data(show_spinner=False)
 def _read_logo_svg(path: str, modified_at: float):
-    """Lê o SVG oficial (com cache invalidado pela data de modificação)."""
+    """Lê o conteúdo do SVG oficial (com cache invalidado pela data de modificação)."""
     try:
         return Path(path).read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
@@ -119,25 +176,6 @@ def _load_acnnorte_logo():
     except OSError:
         return None
     return _read_logo_svg(str(LOGO_PATH), modified_at)
-
-
-def _prepare_inline_svg(svg: str, width: int) -> str:
-    """Remove declarações e aplica a largura desejada ao SVG para uso inline."""
-    svg = re.sub(r"<\?xml[^>]*\?>", "", svg, count=1)
-    svg = re.sub(r"<!DOCTYPE[^>]*>", "", svg, count=1, flags=re.IGNORECASE)
-    height = round(width * LOGO_VIEWBOX_HEIGHT / LOGO_VIEWBOX_WIDTH)
-
-    def _rewrite(match: re.Match) -> str:
-        tag = match.group(0)
-        closing = "/>" if tag.endswith("/>") else ">"
-        inner = tag[: -len(closing)]
-        inner = re.sub(r'\s(?:width|height)="[^"]*"', "", inner)
-        return (
-            f'{inner} width="{width}" height="{height}" '
-            f'style="width:{width}px;max-width:100%;height:auto;"{closing}'
-        )
-
-    return re.sub(r"<svg\b[^>]*>", _rewrite, svg, count=1)
 
 
 def render_acnnorte_logo(
@@ -169,7 +207,13 @@ def render_acnnorte_logo(
 
     svg = _load_acnnorte_logo()
     if svg:
-        markup = _prepare_inline_svg(svg, width)
+        # Renderiza como imagem (data URI) para evitar exibição do código SVG como texto.
+        encoded = base64.b64encode(svg.encode("utf-8")).decode("ascii")
+        markup = (
+            f'<img src="data:image/svg+xml;base64,{encoded}" '
+            f'alt="ACNnorte" width="{width}" '
+            f'style="width:{width}px;max-width:100%;height:auto;display:inline-block;" />'
+        )
     else:
         # Fallback seguro: marca textual com a paleta institucional.
         font_size = max(1.1, round(width / 110, 2))
@@ -191,7 +235,6 @@ def render_acnnorte_logo(
         f'<div style="text-align: {align_css}; margin-bottom: 0.5rem;">{markup}{subtitle_html}</div>',
         unsafe_allow_html=True,
     )
-
 
 def render_section_title(title: str, description: str = None, icon: str = None):
     """Título de seção padronizado, com descrição opcional."""
@@ -284,526 +327,207 @@ def render_flash():
 
 
 def apply_global_styles():
-    """Aplica o design system do ACNnorte a todas as telas."""
-    st.markdown(
-        f"""
-        <style>
-        /* ------------------------------------------------------------------
-           Base
-        ------------------------------------------------------------------ */
-        html, body, [class*="css"] {{
-            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
-        }}
-        .stApp {{
-            background-color: {COLOR_LIGHT_GRAY};
-            color: {COLOR_BLACK};
-        }}
-        .stApp p, .stApp li, .stApp span, .stApp label,
-        .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6,
-        .stApp strong, .stApp b {{
-            color: {COLOR_BLACK};
-        }}
-        .block-container {{
-            padding-top: 2rem;
-            padding-bottom: 3rem;
-            max-width: 1180px;
-        }}
-        h1, h2, h3, h4 {{ font-weight: 700; letter-spacing: -0.2px; }}
-        a {{ color: {COLOR_PRIMARY}; }}
-        hr {{ border-color: #E1E6E2; }}
-        #MainMenu {{ visibility: visible; }}
-        footer {{ visibility: hidden; }}
+    """Aplica o tema claro do ACNnorte a todas as telas.
 
-        /* ------------------------------------------------------------------
-           Sidebar
-        ------------------------------------------------------------------ */
-        [data-testid="stSidebar"] {{
-            background-color: #FFFFFF;
-            border-right: 1px solid #E1E6E2;
-        }}
-        [data-testid="stSidebar"] .block-container {{
-            padding-top: 1.25rem;
-        }}
-        .acn-user-card {{
-            background: {COLOR_LIGHT_GREEN};
-            border: 1px solid #CDE4D3;
-            border-radius: 12px;
-            padding: 10px 12px;
-            margin: 4px 0 10px 0;
-            font-size: 0.88rem;
-            line-height: 1.35;
-            color: {COLOR_BLACK};
-        }}
-        .acn-user-card b {{ color: {COLOR_BLACK}; }}
-        .acn-user-name {{
-            font-size: 0.94rem;
-            font-weight: 700;
-            color: {COLOR_BLACK};
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }}
-        .acn-user-role {{
-            margin-top: 3px;
-            font-size: 0.82rem;
-            font-weight: 600;
-            color: {COLOR_DARK_GREEN};
-        }}
-        .acn-user-caption {{
-            margin-top: 2px;
-            font-size: 0.72rem;
-            color: {COLOR_BLACK};
-        }}
-        [data-testid="stSidebar"] .stButton > button p {{
-            font-size: 0.88rem;
-            line-height: 1.25;
-        }}
-        .acn-nav-label {{
-            font-size: 0.72rem;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: {COLOR_BLACK};
-            margin: 10px 0 4px 2px;
-        }}
-        .acn-sync {{
-            display: flex;
-            gap: 8px;
-            align-items: flex-start;
-            background: {COLOR_LIGHT_GREEN};
-            border: 1px solid #CDE4D3;
-            border-radius: 12px;
-            padding: 10px 12px;
-            font-size: 0.78rem;
-            line-height: 1.35;
-            color: {COLOR_BLACK};
-            margin-top: 6px;
-        }}
-        .acn-sync b {{ color: {COLOR_BLACK}; }}
-        .acn-sync-sub {{ color: {COLOR_BLACK}; font-size: 0.72rem; margin-top: 2px; }}
-        .acn-sync-dot {{
-            width: 10px; height: 10px; margin-top: 3px;
-            background: {COLOR_PRIMARY};
-            border-radius: 50%;
-            flex: 0 0 auto;
-            box-shadow: 0 0 0 3px rgba(22, 131, 74, 0.15);
-        }}
+    A implementação vive em ``src.ui.theme``; esta função é mantida por
+    compatibilidade com o restante da aplicação.
+    """
+    from src.ui.theme.components import apply_theme
 
-        /* ------------------------------------------------------------------
-           Botões (área de toque confortável)
-        ------------------------------------------------------------------ */
-        .stButton > button,
-        .stDownloadButton > button,
-        .stFormSubmitButton > button {{
-            min-height: 46px;
-            border-radius: 10px;
-            font-weight: 600;
-            font-size: 0.95rem;
-            padding: 0.55rem 1rem;
-            transition: background-color 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
-        }}
-        .stButton > button p, .stDownloadButton > button p, .stFormSubmitButton > button p {{
-            color: inherit !important;
-            font-weight: 600;
-        }}
-        .stButton > button[kind="primary"],
-        .stFormSubmitButton > button[kind="primary"],
-        .stDownloadButton > button[kind="primary"] {{
-            background-color: {COLOR_PRIMARY};
-            color: #FFFFFF;
-            border: 1px solid {COLOR_PRIMARY};
-            box-shadow: 0 2px 6px rgba(22, 131, 74, 0.22);
-        }}
-        .stButton > button[kind="primary"]:hover,
-        .stFormSubmitButton > button[kind="primary"]:hover,
-        .stDownloadButton > button[kind="primary"]:hover {{
-            background-color: {COLOR_DARK_GREEN};
-            border-color: {COLOR_DARK_GREEN};
-            color: #FFFFFF;
-        }}
-        .stButton > button[kind="secondary"],
-        .stFormSubmitButton > button[kind="secondary"],
-        .stDownloadButton > button[kind="secondary"] {{
-            background-color: #FFFFFF;
-            color: {COLOR_BLACK};
-            border: 1px solid #CDD5D0;
-        }}
-        .stButton > button[kind="secondary"]:hover,
-        .stFormSubmitButton > button[kind="secondary"]:hover,
-        .stDownloadButton > button[kind="secondary"]:hover {{
-            border-color: {COLOR_PRIMARY};
-            background-color: {COLOR_LIGHT_GREEN};
-        }}
-        .stButton > button:disabled {{
-            opacity: 0.5;
-        }}
+    apply_theme(SIDEBAR_MOBILE_BREAKPOINT_PX)
 
-        /* ------------------------------------------------------------------
-           Menu lateral: botões padronizados em cinza-claro
-        ------------------------------------------------------------------ */
-        [data-testid="stSidebar"] .stButton > button,
-        [data-testid="stSidebar"] .stButton > button[kind="primary"],
-        [data-testid="stSidebar"] .stButton > button[kind="secondary"],
-        [data-testid="stSidebar"] [data-testid="stBaseButton-primary"],
-        [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] {{
-            background-color: #F3F4F6 !important;
-            background-image: none !important;
-            color: #111827 !important;
-            border: 1px solid #E5E7EB !important;
-            border-radius: 10px !important;
-            box-shadow: none !important;
-            opacity: 1 !important;
-        }}
-        [data-testid="stSidebar"] .stButton > button *,
-        [data-testid="stSidebar"] .stButton > button p,
-        [data-testid="stSidebar"] .stButton > button span,
-        [data-testid="stSidebar"] .stButton > button div {{
-            background-color: transparent !important;
-            background-image: none !important;
-            color: #111827 !important;
-            box-shadow: none !important;
-        }}
-        [data-testid="stSidebar"] .stButton > button svg {{
-            fill: #111827 !important;
-            stroke: #111827 !important;
-        }}
-        [data-testid="stSidebar"] .stButton > button:hover,
-        [data-testid="stSidebar"] .stButton > button[kind="primary"]:hover,
-        [data-testid="stSidebar"] .stButton > button[kind="secondary"]:hover,
-        [data-testid="stSidebar"] [data-testid="stBaseButton-primary"]:hover,
-        [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover {{
-            background-color: #E5E7EB !important;
-            color: #111827 !important;
-            border-color: #D1D5DB !important;
-            box-shadow: none !important;
-        }}
-        [data-testid="stSidebar"] .stButton > button:active,
-        [data-testid="stSidebar"] .stButton > button[kind="primary"]:active,
-        [data-testid="stSidebar"] .stButton > button[kind="secondary"]:active {{
-            background-color: #E5E7EB !important;
-            color: #111827 !important;
-            border-color: #D1D5DB !important;
-            box-shadow: none !important;
-        }}
-        [data-testid="stSidebar"] .stButton > button:focus-visible,
-        [data-testid="stSidebar"] .stButton > button[kind="primary"]:focus-visible,
-        [data-testid="stSidebar"] .stButton > button[kind="secondary"]:focus-visible {{
-            background-color: #F3F4F6 !important;
-            color: #111827 !important;
-            outline: 2px solid {COLOR_PRIMARY} !important;
-            outline-offset: 2px;
-            box-shadow: none !important;
-        }}
-        /* Item selecionado: mesmo fundo cinza, com detalhe verde discreto */
-        [data-testid="stSidebar"] .stButton > button[kind="primary"],
-        [data-testid="stSidebar"] [data-testid="stBaseButton-primary"] {{
-            background-color: #F3F4F6 !important;
-            color: #111827 !important;
-            box-shadow: inset 4px 0 0 0 {COLOR_PRIMARY} !important;
-        }}
-        [data-testid="stSidebar"] .stButton > button[kind="primary"]:hover,
-        [data-testid="stSidebar"] [data-testid="stBaseButton-primary"]:hover,
-        [data-testid="stSidebar"] .stButton > button[kind="primary"]:active,
-        [data-testid="stSidebar"] .stButton > button[kind="primary"]:focus-visible {{
-            background-color: #E5E7EB !important;
-            color: #111827 !important;
-            box-shadow: inset 4px 0 0 0 {COLOR_PRIMARY} !important;
-        }}
 
-        /* ------------------------------------------------------------------
-           Formulários e campos
-        ------------------------------------------------------------------ */
-        [data-testid="stForm"] {{
-            background-color: #FFFFFF;
-            border: 1px solid #E1E6E2;
-            border-radius: 14px;
-            padding: 1.25rem 1.1rem;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-        }}
-        .stTextInput > div > div > input,
-        .stTextArea textarea,
-        .stNumberInput input,
-        .stDateInput input {{
-            border-radius: 10px;
-            border: 1px solid #CDD5D0;
-            padding: 0.6rem 0.8rem;
-            font-size: 1rem;
-            min-height: 44px;
-            background-color: #FFFFFF;
-            color: {COLOR_BLACK};
-        }}
-        .stTextArea textarea {{ min-height: 110px; }}
-        .stTextInput > div > div > input:focus,
-        .stTextArea textarea:focus {{
-            border-color: {COLOR_PRIMARY};
-            box-shadow: 0 0 0 3px rgba(22, 131, 74, 0.15);
-        }}
-        [data-baseweb="select"] > div {{
-            border-radius: 10px;
-            min-height: 44px;
-            border-color: #CDD5D0;
-        }}
-        label, .stSelectbox label, .stTextInput label, .stTextArea label {{
-            font-weight: 600 !important;
-            color: {COLOR_BLACK} !important;
-            font-size: 0.92rem;
-        }}
-        [data-testid="stCaptionContainer"], .stCaption {{
-            color: {COLOR_BLACK} !important;
-        }}
+def sidebar_css() -> str:
+    """CSS exclusivo do menu lateral (delegado a ``src.ui.theme``)."""
+    from src.ui.theme.styles import get_sidebar_css
 
-        /* Abas internas em formato de pílulas */
-        [data-testid="stRadio"] [role="radiogroup"] {{
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }}
-        [data-testid="stRadio"] label[data-baseweb="radio"] {{
-            background: #FFFFFF;
-            border: 1px solid #CDD5D0;
-            border-radius: 999px;
-            padding: 6px 14px;
-            margin-right: 0;
-        }}
-        [data-testid="stRadio"] label[data-baseweb="radio"]:has(input:checked) {{
-            background: {COLOR_LIGHT_GREEN};
-            border-color: {COLOR_PRIMARY};
-        }}
-        [data-testid="stRadio"] label[data-baseweb="radio"] p {{
-            font-weight: 600 !important;
-            color: {COLOR_BLACK} !important;
-        }}
+    return get_sidebar_css(SIDEBAR_MOBILE_BREAKPOINT_PX)
 
-        /* ------------------------------------------------------------------
-           Cartões, métricas e estados
-        ------------------------------------------------------------------ */
-        [data-testid="stMetric"] {{
-            background: #FFFFFF;
-            border: 1px solid #E1E6E2;
-            border-left: 5px solid {COLOR_PRIMARY};
-            border-radius: 12px;
-            padding: 14px 16px;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-        }}
-        [data-testid="stMetricLabel"] p {{
-            color: {COLOR_BLACK} !important;
-            font-weight: 600 !important;
-            font-size: 0.88rem;
-        }}
-        [data-testid="stMetricValue"] {{
-            color: {COLOR_BLACK} !important;
-            font-weight: 800 !important;
-        }}
-        [data-testid="stMetricDelta"] {{
-            color: {COLOR_BLACK} !important;
-            font-weight: 600 !important;
-        }}
-        [data-testid="stMetricDelta"] * {{
-            color: {COLOR_BLACK} !important;
-        }}
-        [data-testid="stVerticalBlockBorderWrapper"] {{
-            border-radius: 14px !important;
-        }}
-        .acn-section-title {{
-            font-size: 1.15rem;
-            font-weight: 700;
-            color: {COLOR_BLACK};
-            margin: 0.25rem 0 0.15rem 0;
-        }}
-        .acn-section-subtitle {{
-            font-size: 0.88rem;
-            color: {COLOR_BLACK};
-            margin-bottom: 0.65rem;
-        }}
-        .acn-banner {{
-            background: {COLOR_LIGHT_GREEN};
-            border: 1px solid #CDE4D3;
-            border-left: 4px solid {COLOR_PRIMARY};
-            border-radius: 10px;
-            padding: 10px 14px;
-            font-size: 0.9rem;
-            color: {COLOR_BLACK};
-            margin-bottom: 0.6rem;
-        }}
-        .acn-badge {{
-            display: inline-block;
-            border: 1px solid;
-            border-radius: 999px;
-            padding: 2px 10px;
-            font-size: 0.76rem;
-            font-weight: 700;
-            color: {COLOR_BLACK} !important;
-            white-space: nowrap;
-        }}
-        .acn-empty {{
-            background: #FFFFFF;
-            border: 1px dashed #C6D2CA;
-            border-radius: 14px;
-            padding: 26px 20px;
-            text-align: center;
-            margin: 8px 0 14px 0;
-        }}
-        .acn-empty-icon {{ font-size: 2rem; line-height: 1.2; }}
-        .acn-empty-title {{ font-weight: 700; color: {COLOR_BLACK}; margin-top: 6px; }}
-        .acn-empty-hint {{ color: {COLOR_BLACK}; font-size: 0.88rem; margin-top: 4px; }}
-        .acn-activity {{
-            background: #FFFFFF;
-            border: 1px solid #E1E6E2;
-            border-left: 4px solid {COLOR_SOFT_GREEN};
-            border-radius: 10px;
-            padding: 10px 14px;
-            margin-bottom: 8px;
-            font-size: 0.9rem;
-            color: {COLOR_BLACK};
-        }}
-        .acn-activity b {{ color: {COLOR_BLACK}; }}
-        .acn-activity-meta {{ color: {COLOR_BLACK}; font-size: 0.78rem; }}
-        .acn-photo-card {{
-            background: #FFFFFF;
-            border: 1px solid #E1E6E2;
-            border-radius: 14px;
-            padding: 12px;
-            margin-bottom: 12px;
-        }}
-        .acn-photo-caption {{
-            font-weight: 600;
-            color: {COLOR_BLACK};
-            margin-top: 8px;
-            font-size: 0.9rem;
-        }}
-        .acn-photo-meta {{ color: {COLOR_BLACK}; font-size: 0.76rem; }}
 
-        /* Expanders */
-        [data-testid="stExpander"] {{
-            background: #FFFFFF;
-            border: 1px solid #E1E6E2;
-            border-radius: 12px;
-            overflow: hidden;
-        }}
-        [data-testid="stExpander"] summary p {{
-            font-weight: 600 !important;
-            color: {COLOR_BLACK} !important;
-        }}
+def inject_sidebar_css():
+    """Injeta o CSS do menu lateral (uma única fonte de verdade)."""
+    from src.ui.theme.components import inject_sidebar_css as _inject
 
-        /* Barra de progresso */
-        .stProgress > div > div > div > div {{
-            background-color: {COLOR_PRIMARY};
-        }}
+    _inject(SIDEBAR_MOBILE_BREAKPOINT_PX)
 
-        /* Abas do Streamlit */
-        [data-baseweb="tab-list"] {{ gap: 4px; }}
-        [data-baseweb="tab"] {{
-            border-radius: 10px 10px 0 0;
-        }}
-        [data-baseweb="tab"] p {{
-            font-weight: 600 !important;
-            color: {COLOR_BLACK} !important;
-        }}
-        [data-baseweb="tab-highlight"] {{ background-color: {COLOR_PRIMARY}; }}
 
-        /* ------------------------------------------------------------------
-           Formulário de campo
-        ------------------------------------------------------------------ */
-        .acn-field-header {{
-            background: #FFFFFF;
-            border: 1px solid #E1E6E2;
-            border-radius: 14px;
-            padding: 14px 16px;
-            margin-bottom: 12px;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-        }}
-        .acn-weather-card {{
-            background: {COLOR_LIGHT_GREEN};
-            border: 1px solid #CDE4D3;
-            border-left: 5px solid {COLOR_PRIMARY};
-            border-radius: 12px;
-            padding: 12px 14px;
-            color: {COLOR_BLACK};
-            font-size: 0.9rem;
-        }}
-        .acn-weather-card b {{ color: {COLOR_BLACK}; }}
-        .acn-worker-photo {{
-            border: 2px solid {COLOR_SOFT_GREEN};
-            border-radius: 12px;
-            padding: 6px;
-            background: #FFFFFF;
-        }}
-        .acn-chip-list {{
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            margin-top: 4px;
-        }}
-        .acn-chip {{
-            display: inline-block;
-            background: {COLOR_LIGHT_GREEN};
-            border: 1px solid {COLOR_PRIMARY};
-            border-radius: 999px;
-            padding: 3px 10px;
-            font-size: 0.78rem;
-            font-weight: 600;
-            color: {COLOR_BLACK};
-        }}
+def build_sidebar_bridge_html(
+    command: str | None = None,
+    render_token: str | None = None,
+) -> str:
+    """Monta a ponte HTML/JS que aciona os controles nativos da sidebar.
 
-        /* Botão flutuante de acesso rápido à galeria do dia */
-        .st-key-gallery_fab {{
-            position: fixed;
-            right: 22px;
-            bottom: 22px;
-            z-index: 99999;
-            width: auto !important;
-            background: transparent;
-        }}
-        .st-key-gallery_fab .stButton > button {{
-            border-radius: 999px;
-            background-color: {COLOR_PRIMARY};
-            color: #FFFFFF;
-            border: 1px solid {COLOR_PRIMARY};
-            box-shadow: 0 6px 18px rgba(22, 131, 74, 0.35);
-            min-height: 52px;
-            padding: 0.6rem 1.2rem;
-            font-weight: 700;
-        }}
-        .st-key-gallery_fab .stButton > button:hover {{
-            background-color: {COLOR_DARK_GREEN};
-            border-color: {COLOR_DARK_GREEN};
-            color: #FFFFFF;
-        }}
+    A ponte roda em um iframe same-origin e acessa ``window.parent.document``.
+    Ela tolera os testids do Streamlit 1.64.0 e os nomes usados por versões
+    anteriores. ``command`` é executado uma única vez por renderização e
+    ``render_token`` garante que o iframe seja recarregado a cada comando.
+    """
+    command_json = json.dumps(command)
+    token_json = json.dumps(render_token or "")
+    return f"""
+    <!doctype html>
+    <html>
+    <head><meta charset="utf-8">
+    <style>html, body {{ margin:0; padding:0; height:0; overflow:hidden; background:transparent; }}</style>
+    </head>
+    <body>
+    <script>
+    (function() {{
+        const COMMAND = {command_json};
+        const RENDER_TOKEN = {token_json};
+        const MOBILE_BREAKPOINT = {SIDEBAR_MOBILE_BREAKPOINT_PX};
+        const doc = window.parent.document;
 
-        /* ------------------------------------------------------------------
-           Responsividade (computador, tablet e celular)
-        ------------------------------------------------------------------ */
-        @media (max-width: 1024px) {{
-            .block-container {{ padding-left: 1.2rem; padding-right: 1.2rem; }}
+        function sidebar() {{
+            return doc.querySelector('[data-testid="stSidebar"]');
         }}
-        @media (max-width: 768px) {{
-            .block-container {{
-                padding: 1rem 0.75rem 2.5rem 0.75rem;
-                max-width: 100%;
+        function isExpanded() {{
+            const el = sidebar();
+            if (!el) return false;
+            const aria = el.getAttribute('aria-expanded');
+            if (aria === 'true') return true;
+            if (aria === 'false') return false;
+            return el.offsetWidth > 40;
+        }}
+        function isMobile() {{
+            try {{
+                return window.parent.matchMedia(
+                    '(max-width: ' + MOBILE_BREAKPOINT + 'px)'
+                ).matches;
+            }} catch (e) {{
+                return false;
             }}
-            h1 {{ font-size: 1.55rem !important; }}
-            h2 {{ font-size: 1.3rem !important; }}
-            h3 {{ font-size: 1.12rem !important; }}
-            [data-testid="stMetricValue"] {{ font-size: 1.5rem !important; }}
-            .stButton > button, .stFormSubmitButton > button, .stDownloadButton > button {{
-                min-height: 50px;
-                font-size: 1rem;
+        }}
+        function first(selectors) {{
+            for (const selector of selectors) {{
+                const element = doc.querySelector(selector);
+                if (element) return element;
             }}
-            [data-testid="stForm"] {{ padding: 0.9rem 0.75rem; }}
-            .acn-section-title {{ font-size: 1.05rem; }}
-            .acn-user-card {{ font-size: 0.85rem; }}
+            return null;
         }}
-        @media (hover: none) and (pointer: coarse) {{
-            .stButton > button, .stFormSubmitButton > button, .stDownloadButton > button {{
-                min-height: 50px;
+        function expandControl() {{
+            return first([
+                '[data-testid="stExpandSidebarButton"] button',
+                '[data-testid="stExpandSidebarButton"]',
+                '[data-testid="stSidebarCollapsedControl"] button',
+                '[data-testid="stSidebarCollapsedControl"]',
+                '[data-testid="collapsedControl"] button',
+                '[data-testid="collapsedControl"]',
+                'button[kind="header"][data-testid*="collapsed"]'
+            ]);
+        }}
+        function collapseControl() {{
+            return first([
+                '[data-testid="stSidebarCollapseButton"] button',
+                '[data-testid="stSidebarCollapseButton"]',
+                '[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] button',
+                '[data-testid="stSidebar"] button[kind="header"]'
+            ]);
+        }}
+        function click(element) {{
+            if (!element) return false;
+            element.click();
+            return true;
+        }}
+        function tryOpen() {{
+            return click(expandControl()) || click(collapseControl());
+        }}
+        function tryClose() {{
+            return click(collapseControl()) || click(expandControl());
+        }}
+        function syncControls() {{
+            const open = isExpanded();
+            /* O Streamlit pode renderizar dois botões no mesmo container
+               (um clone interno de tooltip). Atualizamos todos para que o
+               botão realmente visível também receba o rótulo acessível. */
+            doc.querySelectorAll('.st-key-sidebar_toggle button').forEach(
+                function (button) {{
+                    button.setAttribute('aria-label', open ? 'Fechar menu' : 'Abrir menu');
+                    button.setAttribute('title', open ? 'Fechar menu' : 'Abrir menu');
+                }}
+            );
+            doc.querySelectorAll('.st-key-sidebar_close_menu button').forEach(
+                function (button) {{
+                    button.setAttribute('aria-label', 'Fechar menu');
+                }}
+            );
+            const toggleContainer = first(['.st-key-sidebar_toggle']);
+            if (toggleContainer) {{
+                /* No celular, com o menu aberto, o próprio "✕ Fechar menu"
+                   já está visível; escondemos o flutuante para não cobrir. */
+                toggleContainer.style.display = (open && isMobile()) ? 'none' : '';
             }}
-            [data-baseweb="select"] > div {{ min-height: 48px; }}
-            [data-testid="stRadio"] label[data-baseweb="radio"] {{ padding: 10px 16px; }}
         }}
-        @media (prefers-reduced-motion: reduce) {{
-            * {{ transition: none !important; animation: none !important; }}
+        function applyCommand(tries) {{
+            tries = tries || 0;
+            let resolved = true;
+            if (COMMAND === 'toggle') {{
+                resolved = isExpanded() ? tryClose() : tryOpen();
+            }} else if (COMMAND === 'close') {{
+                resolved = isExpanded() ? tryClose() : true;
+            }} else if (COMMAND === 'close_if_mobile') {{
+                resolved = (isMobile() && isExpanded()) ? tryClose() : true;
+            }}
+            if (!resolved && tries < 20) {{
+                window.setTimeout(function() {{ applyCommand(tries + 1); }}, 80);
+                return;
+            }}
+            window.setTimeout(syncControls, 60);
         }}
-        </style>
-        """,
-        unsafe_allow_html=True,
+        function observeSidebar() {{
+            const el = sidebar();
+            if (!el || !window.parent.MutationObserver) return;
+            try {{
+                const observer = new window.parent.MutationObserver(syncControls);
+                observer.observe(el, {{
+                    attributes: true,
+                    attributeFilter: ['aria-expanded', 'class', 'style']
+                }});
+            }} catch (e) {{}}
+        }}
+        window.setTimeout(function() {{
+            applyCommand(0);
+            observeSidebar();
+            syncControls();
+        }}, 60);
+    }})();
+    </script>
+    </body>
+    </html>
+    """
+
+
+def _render_sidebar_bridge(markup: str):
+    """Renderiza a ponte invisível (1 px) com compatibilidade de versões."""
+    if hasattr(st, "iframe"):
+        # st.iframe (Streamlit atual) substitui components.v1.html e mantém
+        # acesso same-origin ao documento pai.
+        st.iframe(markup, height=1)
+        return
+    from streamlit.components.v1 import html as component_html
+
+    component_html(markup, height=1, scrolling=False)
+
+
+def render_sidebar_toggle():
+    """Botão "☰ Menu" fixo e ponte JS para abrir/fechar a sidebar nativa.
+
+    O botão é um ``st.button`` real (testável, com foco e área de toque) e a
+    ponte apenas executa a ação no front-end. A intenção fica em
+    ``st.session_state["sidebar_open"]`` e sobrevive a reruns e navegação.
+    """
+    st.session_state.setdefault(SIDEBAR_OPEN_KEY, True)
+
+    if st.button(
+        "☰ Menu",
+        key="sidebar_toggle",
+        help="Abrir ou fechar o menu lateral",
+    ):
+        request_sidebar_toggle()
+
+    command = st.session_state.pop(SIDEBAR_COMMAND_KEY, None)
+    # O token muda o HTML a cada run para o navegador reexecutar a ponte
+    # (inclusive em cliques repetidos de "alternar"). 1 px é suficiente.
+    _render_sidebar_bridge(
+        build_sidebar_bridge_html(command, next_sidebar_render_token())
     )

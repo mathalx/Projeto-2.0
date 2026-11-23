@@ -43,10 +43,19 @@ O sistema inicia com três usuários padrão (credenciais confidenciais geridas 
 - **Preencher Visita:** o checklist é dividido em etapas (EPI, Condições Gerais,
   Incêndio, Máquinas e Documentação), com barra de progresso.
 - Campos com `*` são obrigatórios para finalizar.
+- **Equipamentos (Dosimetria de Ruído):** selecione um ou mais equipamentos
+  tocando nos botões da etapa de equipamentos. Os botões selecionados ficam
+  destacados em verde e cada identificação é vinculada automaticamente à visita
+  e à sua respectiva medição. Pelo menos um equipamento é obrigatório para
+  finalizar a visita.
 - Use **Voltar** e **Avançar** livremente: as respostas são salvas
   automaticamente.
 - **Salvar agora** grava imediatamente; **Finalizar visita** pede confirmação e
-  só é liberado quando não há campos obrigatórios pendentes.
+  só é liberado quando não há campos obrigatórios, equipamentos ou assinaturas
+  pendentes.
+- Na etapa final, informe o nome e desenhe as assinaturas do **Responsável
+  Técnico** e do **Avaliador**. As duas são obrigatórias para finalizar, mas o
+  rascunho pode ser salvo sem elas.
 - Para retomar um rascunho, use **Continuar preenchimento** na lista de visitas.
 
 ## 8. Fotografias
@@ -57,7 +66,10 @@ O sistema inicia com três usuários padrão (credenciais confidenciais geridas 
 
 ## 9. Relatórios e Exportações
 - **Relatório PDF:** selecione a visita e clique em **Gerar relatório PDF**; o
-  download fica disponível na tela.
+  download fica disponível na tela. O PDF inclui os equipamentos de Dosimetria
+  de Ruído utilizados, as assinaturas registradas e o aviso de que elas não
+  possuem validade jurídica automática.
 - **Exportação Excel:** gere planilhas de clientes e de visitas separadamente.
+  A planilha de visitas inclui os equipamentos e medições vinculadas.
 - As mensagens informam quando o arquivo está pronto ou quando não há dados.
 

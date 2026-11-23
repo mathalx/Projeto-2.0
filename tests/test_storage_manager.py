@@ -1,6 +1,7 @@
 import json
 import os
 
+import pandas as pd
 import pytest
 
 import src.export_manager as export_manager
@@ -9,6 +10,13 @@ from src.form_template import (
     first_unanswered_section,
     section_completion,
     visit_completion,
+)
+
+# PNG 1x1 válido para simular a assinatura exportada pelo canvas.
+SIGNATURE_DATA_URL = (
+    "data:image/png;base64,"
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
+    "+A8AAQUBAScY42YAAAAASUVORK5CYII="
 )
 
 
@@ -137,12 +145,133 @@ def test_exports_generate_files(isolated_storage):
     )
     _success, visit_id, _ = storage.add_visit(client_id, "Técnico", "2026-01-01")
     storage.update_visit(visit_id, {}, "Obs", "Conclusão", "Finalizada")
+    storage.save_visit_signature(
+        visit_id,
+        "technical",
+        name="Responsável Técnico",
+        data_url=SIGNATURE_DATA_URL,
+    )
+    storage.save_visit_signature(
+        visit_id,
+        "evaluator",
+        name="Avaliador",
+        data_url=SIGNATURE_DATA_URL,
+    )
+    storage.save_visit_equipment(
+        visit_id, ["CHR-2386", "INS-DOS-100X"]
+    )
 
     pdf_path = export_manager.generate_pdf_report(visit_id)
     assert pdf_path and os.path.exists(pdf_path)
+
+    visit = storage.load_visits()[visit_id]
+    assert storage.visit_has_signature(visit, "technical")
+    assert storage.visit_has_signature(visit, "evaluator")
+    assert storage.missing_signatures(visit) == []
+    assert storage.missing_equipment(visit) == []
 
     clients_xlsx = export_manager.export_clients_to_excel()
     assert clients_xlsx and os.path.exists(clients_xlsx)
 
     visits_xlsx = export_manager.export_visits_to_excel()
     assert visits_xlsx and os.path.exists(visits_xlsx)
+    visits_df = pd.read_excel(visits_xlsx)
+    assert "Equipamentos (Dosimetria de Ruído)" in visits_df.columns
+    assert "Chrompack 2386" in visits_df.iloc[0][
+        "Equipamentos (Dosimetria de Ruído)"
+    ]
+
+
+# ---------------------------------------------------------------------------
+# CHANGE 02 — Identificação do funcionário com foto
+# ---------------------------------------------------------------------------
+
+def test_worker_photo_save_and_remove(isolated_storage):
+    """save_worker_photo persiste o arquivo; remove_worker_photo apaga e limpa."""
+    storage.init_storage()
+    _ok, client_id, _ = storage.add_client(
+        "Empresa X", "1", "Rua A", "Resp", "Tel", "x@x.com"
+    )
+    _ok, visit_id, _ = storage.add_visit(client_id, "Técnico", "2026-06-01")
+
+    fake_bytes = b"\x89PNG\r\n\x1a\n" + b"\x00" * 20  # bytes mínimos de PNG fake
+    success, path, msg = storage.save_worker_photo(visit_id, fake_bytes, "foto.png")
+    assert success, msg
+    assert path and os.path.exists(path)
+
+    visit = storage.load_visits()[visit_id]
+    assert isinstance(visit.get("worker"), dict)
+    assert visit["worker"]["photo_path"] == path
+    assert visit.get("worker_photo") == path
+
+    # Remove a foto — arquivo deve ser deletado e campo limpo
+    success, msg = storage.remove_worker_photo(visit_id)
+    assert success, msg
+    assert not os.path.exists(path)
+
+    visit = storage.load_visits()[visit_id]
+    assert visit["worker"]["photo_path"] == ""
+    assert visit.get("worker_photo") == ""
+
+
+def test_worker_photo_replaces_old_file(isolated_storage):
+    """Salvar uma nova foto exclui a foto anterior do disco."""
+    storage.init_storage()
+    _ok, client_id, _ = storage.add_client(
+        "Empresa Y", "2", "Rua B", "Resp2", "Tel2", "y@y.com"
+    )
+    _ok, visit_id, _ = storage.add_visit(client_id, "Técnico", "2026-06-02")
+
+    fake_bytes = b"\x89PNG\r\n" + b"\x00" * 10
+    _ok, path1, _ = storage.save_worker_photo(visit_id, fake_bytes, "foto1.png")
+    assert os.path.exists(path1)
+
+    _ok, path2, _ = storage.save_worker_photo(visit_id, fake_bytes, "foto2.jpg")
+    assert os.path.exists(path2)
+    assert not os.path.exists(path1), "O arquivo antigo deveria ter sido removido"
+
+
+def test_update_worker_info(isolated_storage):
+    """update_worker_info atualiza nome no dicionário worker e campo worker_name."""
+    storage.init_storage()
+    _ok, client_id, _ = storage.add_client(
+        "Empresa Z", "3", "Rua C", "Resp3", "Tel3", "z@z.com"
+    )
+    _ok, visit_id, _ = storage.add_visit(client_id, "Técnico", "2026-06-03")
+
+    success, msg = storage.update_worker_info(visit_id, "  João Silva  ")
+    assert success, msg
+
+    visit = storage.load_visits()[visit_id]
+    assert visit["worker"]["name"] == "João Silva"
+    assert visit["worker_name"] == "João Silva"
+
+
+def test_worker_functions_reject_unknown_visit(isolated_storage):
+    """Funções de worker retornam erro para visit_id inexistente."""
+    storage.init_storage()
+    fake_id = "nao-existe-999"
+
+    success, path, msg = storage.save_worker_photo(fake_id, b"bytes", "f.jpg")
+    assert not success
+    assert path == ""
+
+    success, msg = storage.remove_worker_photo(fake_id)
+    assert not success
+
+    success, msg = storage.update_worker_info(fake_id, "Alguém")
+    assert not success
+
+
+def test_add_visit_stores_worker_name(isolated_storage):
+    """add_visit aceita worker_name e o persiste corretamente."""
+    storage.init_storage()
+    _ok, client_id, _ = storage.add_client(
+        "Empresa W", "4", "Rua D", "Resp4", "Tel4", "w@w.com"
+    )
+    _ok, visit_id, _ = storage.add_visit(
+        client_id, "Técnico", "2026-06-04", worker_name="Maria Costa"
+    )
+
+    visit = storage.load_visits()[visit_id]
+    assert visit.get("worker_name") == "Maria Costa"
