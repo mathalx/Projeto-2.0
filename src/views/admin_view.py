@@ -1,6 +1,8 @@
 import streamlit as st
-from src.ui_components import render_acnnorte_logo
 from src.auth_manager import load_users, add_user, toggle_user_status, delete_user, admin_reset_password
+from src.storage_manager import load_visits, save_visits
+from src.ui_components import info_banner, record_sync, render_acnnorte_logo
+from src.xano_sync import pull_visits, sync_enabled
 
 def render_admin_view():
     is_admin = st.session_state.get("is_admin", False)
@@ -80,9 +82,49 @@ def render_admin_view():
                     else:
                         st.error(msg)
 
+        # Recuperação opcional de visitas a partir do backend Xano. O JSON local
+        # continua sendo a fonte autoritativa: apenas visitas ausentes são
+        # incorporadas, preservando registros e edições já existentes.
+        with st.expander("🔄 Recuperar visitas do Xano"):
+            token = st.session_state.get("xano_token")
+            if not sync_enabled(token):
+                info_banner(
+                    "A recuperação fica disponível quando o Xano estiver configurado "
+                    "e a sessão administrativa estiver autenticada nesse serviço."
+                )
+            elif st.button("Buscar visitas remotas", key="xano_pull_preview", width="stretch"):
+                try:
+                    st.session_state["xano_remote_visits"] = pull_visits(token=token)
+                except Exception:
+                    st.error("Não foi possível consultar as visitas do Xano. Tente novamente.")
+            remote_visits = st.session_state.get("xano_remote_visits")
+            if remote_visits is not None:
+                if not remote_visits:
+                    st.info("Nenhuma visita remota disponível para recuperação.")
+                else:
+                    st.caption(f"{len(remote_visits)} visita(s) encontrada(s) no Xano.")
+                    if st.button("Mesclar visitas ausentes", key="xano_pull_merge", type="primary", width="stretch"):
+                        try:
+                            local = load_visits()
+                            added = 0
+                            for visit in remote_visits:
+                                visit_id = str(visit.get("id") or "").strip()
+                                if visit_id and visit_id not in local:
+                                    local[visit_id] = visit
+                                    added += 1
+                            if added:
+                                save_visits(local)
+                                record_sync()
+                        except Exception:
+                            st.error("Não foi possível salvar as visitas recuperadas. Tente novamente.")
+                        else:
+                            st.success(f"{added} visita(s) recuperada(s) com sucesso.")
+                            st.session_state.pop("xano_remote_visits", None)
+                            st.rerun()
+
     with tab2:
         st.markdown("#### Cadastrar Novo Usuário")
-        st.info("O cadastro de novos usuários é exclusivo para a área administrativa protegida da ACNnorte.")
+        info_banner("O cadastro de novos usuários é exclusivo para a área administrativa protegida da ACNnorte.")
         
         with st.form("new_user_form"):
             new_username = st.text_input("Nome de Usuário", placeholder="Ex: joao.norte")

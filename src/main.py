@@ -1,5 +1,16 @@
 import html
 import os
+import sys
+from pathlib import Path
+
+# Os módulos usam imports absolutos ``src.*``. Quando a aplicação é iniciada por
+# um caminho completo (por exemplo, ``streamlit run .../src/main.py``) a pasta
+# raiz pode não entrar automaticamente no ``sys.path``. Este único ajuste no
+# orquestrador mantém a execução consistente de qualquer diretório, sem
+# duplicar mecanismos de importação nos módulos filhos.
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 import streamlit as st
 

@@ -1,3 +1,6 @@
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -102,3 +105,40 @@ def test_sidebar_navigation_changes_page():
     app.run()
     assert not app.exception, [error.value for error in app.exception]
     assert app.session_state["current_page"] == "Clientes"
+
+
+def test_main_registers_every_navigation_page():
+    import src.main as main_module
+    from src.ui_components import NAV_ITEMS
+
+    assert set(main_module.PAGE_RENDERERS) == {item[0] for item in NAV_ITEMS}
+
+
+def test_feature_registry_loads_all_modules():
+    from src.features import available_features, initialize_features
+
+    loaded = initialize_features()
+    assert set(loaded) == set(available_features())
+    assert all(hasattr(module, "__name__") for module in loaded.values())
+
+
+def test_entry_points_import_from_foreign_cwd():
+    root = Path(__file__).resolve().parents[1]
+    entry_points = (root / "src" / "main.py", root / "main.py")
+    code = (
+        "import importlib.util;"
+        "spec=importlib.util.spec_from_file_location('acn_import_probe', {!r});"
+        "module=importlib.util.module_from_spec(spec);"
+        "spec.loader.exec_module(module);"
+        "print('OK')"
+    )
+    for entry in entry_points:
+        result = subprocess.run(
+            [sys.executable, "-c", code.format(str(entry))],
+            cwd=tempfile.gettempdir(),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, result.stderr
+        assert "OK" in result.stdout

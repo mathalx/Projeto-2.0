@@ -8,8 +8,11 @@ from __future__ import annotations
 
 import streamlit as st
 
-from src.equipment_catalog import equipment_label
-from src.storage_manager import get_visit_equipment, load_clients, missing_signatures
+from src.storage_manager import (
+    load_clients,
+    visit_equipment_labels,
+    visit_measurement_labels,
+)
 from src.ui_components import status_badge
 
 from ..equipment.equipment_selector import render_equipment_block, validate_equipment_for_completion
@@ -42,7 +45,8 @@ def render_visit_summary_panel(visit: dict, *, title: str = "Resumo da visita") 
         company = visit.get("client_name") or client.get("name") or "—"
         worker = visit.get("worker") if isinstance(visit.get("worker"), dict) else {}
         worker_name = worker.get("name") or visit.get("worker_name") or "—"
-        equipment = get_visit_equipment(visit)
+        equipment_labels = visit_equipment_labels(visit)
+        measurement_labels = visit_measurement_labels(visit)
         weather = visit.get("weather") if isinstance(visit.get("weather"), dict) else {}
         photos = visit.get("photos", []) if isinstance(visit.get("photos"), list) else []
         pending_eq = validate_equipment_for_completion(visit)
@@ -51,12 +55,16 @@ def render_visit_summary_panel(visit: dict, *, title: str = "Resumo da visita") 
         st.markdown(f"**Empresa:** {company}")
         st.markdown(f"**Data:** {_visit_date_label(visit)}")
         st.markdown(f"**Funcionário:** {worker_name}")
-        st.markdown(f"**Equipamentos:** {len(equipment)} selecionado(s)")
-        if equipment:
-            for item in equipment[:5]:
-                st.caption(f"• {equipment_label(item)}")
-            if len(equipment) > 5:
-                st.caption(f"• +{len(equipment) - 5} outro(s)")
+        st.markdown(f"**Equipamentos:** {len(equipment_labels)} selecionado(s)")
+        if equipment_labels:
+            for label in equipment_labels[:5]:
+                st.caption(f"• {label}")
+            if len(equipment_labels) > 5:
+                st.caption(f"• +{len(equipment_labels) - 5} outro(s)")
+        if measurement_labels:
+            st.caption("Medições: " + ", ".join(measurement_labels[:5]))
+            if len(measurement_labels) > 5:
+                st.caption(f"• +{len(measurement_labels) - 5} outra(s)")
         temp = weather.get("temperature_c")
         st.markdown(f"**Temperatura externa:** {temp if temp is not None else '—'}")
         st.markdown(f"**Origem:** {weather.get('source') or '—'}")
