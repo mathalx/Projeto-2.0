@@ -1,7 +1,7 @@
 """Gerenciamento de fotografias por visita (CHANGE 07).
 
 Integra com ``src.views.photos_view`` e ``src.storage_manager`` sem duplicar
-armazenamento ou navega??o. Fotografias permanecem associadas ? visita correta.
+armazenamento ou navegação. Fotografias permanecem associadas à visita correta.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ def build_photo_identification(horario: str, equipment_label: str) -> str:
     horario = str(horario or "").strip()
     equipment_label = str(equipment_label or "").strip()
     if horario and equipment_label:
-        return f"{horario} ? {equipment_label}"
+        return f"{horario} — {equipment_label}"
     return equipment_label or horario
 
 
@@ -26,23 +26,23 @@ def render_photographs_block(
     key_prefix: str = "ve_photo",
     embed_gallery_hint: bool = True,
 ) -> dict:
-    """Bloco auxiliar para o fluxo de visita com acesso integrado ? galeria."""
+    """Bloco auxiliar para o fluxo de visita com acesso integrado à galeria."""
     st.markdown("#### Fotografias")
     st.caption(
-        "Capture pelo celular ou selecione da galeria, visualize, edite identifica??o/legenda/observa??es, "
-        "substitua ou exclua. Registre hor?rio e equipamento. Padr?o: `Hor?rio + identifica??o do equipamento`."
+        "Capture pelo celular ou selecione da galeria, visualize, edite identificação/legenda/observações, "
+        "substitua ou exclua. Registre horário e equipamento. Padrão: `Horário + identificação do equipamento`."
     )
     photos = visit.get("photos", []) if isinstance(visit, dict) else []
     st.markdown(f"**Fotografias nesta visita:** {len(photos)}")
 
     if embed_gallery_hint:
         st.info(
-            "As fotografias s?o gerenciadas na tela **Fotografias** (galeria por visita, sem mistura entre visitas/empresas). "
-            "Use o bot?o abaixo para abrir a galeria desta visita."
+            "As fotografias são gerenciadas na tela **Fotografias** (galeria por visita, sem mistura entre visitas/empresas). "
+            "Use o botão abaixo para abrir a galeria desta visita."
         )
 
     if st.button(
-        "Avan?ar para fotografias ?",
+        "Avançar para fotografias →",
         key=f"{key_prefix}_{visit_id}_go_photos",
         type="primary",
         width="stretch",

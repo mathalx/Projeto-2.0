@@ -1,13 +1,14 @@
-"""Integra??o das extens?es de visita ?s telas existentes.
+"""Integração das extensões de visita às telas existentes.
 
-Conecta componentes/servi?os reutiliz?veis sem recriar auth, clientes,
-armazenamento, Xano, exporta??o ou navega??o independente.
+Conecta componentes/serviços reutilizáveis sem recriar auth, clientes,
+armazenamento, Xano, exportação ou navegação independente.
 """
 
 from __future__ import annotations
 
 import streamlit as st
 
+from src.features import available_features
 from src.storage_manager import load_visits, missing_equipment, missing_signatures
 
 from ..equipment.equipment_selector import render_equipment_block
@@ -19,19 +20,12 @@ from ..visit_form.visit_form_flow import render_visit_flow_blocks, render_visit_
 
 
 def get_available_enhancement_blocks() -> list[str]:
-    return [
-        "temperature",
-        "signatures",
-        "equipment",
-        "visit_form_flow",
-        "photographs",
-        "reports",
-        "integration",
-    ]
+    """Lista os blocos registrados no ponto central de inicialização."""
+    return list(available_features())
 
 
 def finalize_visit_guard(visit: dict) -> tuple[bool, list[str]]:
-    """Valida requisitos adicionais para conclus?o (equipamentos e assinaturas)."""
+    """Valida requisitos adicionais para conclusão (equipamentos e assinaturas)."""
     problems: list[str] = []
     pending_eq = missing_equipment(visit)
     pending_sig = missing_signatures(visit)
@@ -50,29 +44,33 @@ def render_visit_enhancements_panel(
     read_only: bool = False,
     in_sidebar: bool = False,
 ) -> dict:
-    """Painel integr?vel em telas existentes (?rea central ou lateral)."""
+    """Painel integrável em telas existentes (área central ou lateral)."""
     visits = load_visits()
     visit = visits.get(str(visit_id), {})
     if not visit:
-        st.warning("Visita n?o encontrada para exibir extens?es.")
+        st.warning("Visita não encontrada para exibir extensões.")
         return {"visit_id": visit_id, "found": False}
 
-    target = st.sidebar if in_sidebar else st
+    # ``st`` (o módulo) não é um context manager; use um container explícito
+    # para a área central. A sidebar já é um context manager nativo.
+    central_summary = show_summary and not (show_blocks and not in_sidebar)
+    target = st.sidebar if in_sidebar else (st.container() if central_summary else None)
     result = {"visit_id": visit_id, "found": True}
 
-    if show_summary:
+    if central_summary:
         with target:
             render_visit_summary_panel(visit)
 
     if show_blocks and not in_sidebar:
-        # Em ?rea central, usar layout responsivo: blocos principais + resumo lateral quando houver espa?o.
+        # Em área central, usar layout responsivo: blocos principais + resumo lateral quando houver espaço.
         main_col, side_col = st.columns([3, 1], gap="medium")
         with main_col:
             result["blocks"] = render_visit_flow_blocks(visit_id, visit, read_only=read_only)
-        with side_col:
-            render_visit_summary_panel(visit, title="Status")
+        if show_summary:
+            with side_col:
+                render_visit_summary_panel(visit, title="Status")
     elif show_blocks and in_sidebar:
-        with target:
-            st.caption("Use a ?rea central para formul?rios extensos e assinaturas.")
+        with st.sidebar:
+            st.caption("Use a área central para formulários extensos e assinaturas.")
 
     return result

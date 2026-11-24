@@ -1,7 +1,7 @@
-"""Servi?o/bloco de temperatura (CHANGE 03).
+"""Serviço/bloco de temperatura (CHANGE 03).
 
-Reaproveita os m?dulos existentes ``src.weather_service``, ``src.geolocation`` e
-``src.storage_manager`` sem duplicar regras de captura ou persist?ncia.
+Reaproveita os módulos existentes ``src.weather_service``, ``src.geolocation`` e
+``src.storage_manager`` sem duplicar regras de captura ou persistência.
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ def capture_and_save_external_weather(
     if lat is None or lon is None:
         return (
             False,
-            "N?o foi poss?vel obter a localiza??o. Autorize o GPS ou informe latitude e longitude.",
+            "Não foi possível obter a localização. Autorize o GPS ou informe latitude e longitude.",
             None,
         )
 
@@ -64,7 +64,7 @@ def capture_and_save_external_weather(
     except Exception:
         return (
             False,
-            "N?o foi poss?vel consultar o clima agora. Verifique a conex?o e tente informar manualmente.",
+            "Não foi possível consultar o clima agora. Verifique a conexão e tente informar manualmente.",
             None,
         )
 
@@ -123,30 +123,31 @@ def render_temperature_block(
     key_prefix: str = "ve_temp",
     read_only: bool = False,
 ) -> dict[str, Any]:
-    """Renderiza bloco de condi??es ambientais reutiliz?vel."""
+    """Renderiza bloco de condições ambientais reutilizável."""
     weather = _weather_of(visit)
-    geo_key = f"{key_prefix}_{visit_id}_geo"
-    # Em modo somente leitura não há motivo para pedir a localização ao
-    # dispositivo; o botão continua disponível para uma captura manual.
-    geo_state = geolocation(key=geo_key, auto_request=not read_only)
+    # Em modo somente leitura não há motivo para instanciar o componente de
+    # localização: apenas exibimos o clima já persistido na visita.
+    geo_state = {}
+    if not read_only:
+        geo_state = geolocation(key=f"{key_prefix}_{visit_id}_geo")
     gps_lat = geo_state.get("latitude")
     gps_lon = geo_state.get("longitude")
 
-    st.markdown("#### Condi??es ambientais")
+    st.markdown("#### Condições ambientais")
     st.caption(
-        "Temperatura externa obtida pelo clima da localiza??o (n?o substitui medi??o interna com term?metro)."
+        "Temperatura externa obtida pelo clima da localização (não substitui medição interna com termômetro)."
     )
 
     if read_only:
         st.markdown(f"**Temperatura externa:** {format_temperature(weather.get('temperature_c'))}")
         internal = weather.get("internal_temperature_c")
         st.markdown(
-            f"**Temperatura interna:** {format_temperature(internal) if internal is not None else 'N?o informada'}"
+            f"**Temperatura interna:** {format_temperature(internal) if internal is not None else 'Não informada'}"
         )
         st.markdown(f"**Umidade:** {format_humidity(weather.get('humidity_pct'))}")
-        st.markdown(f"**Origem:** {weather.get('source') or 'N?o informada'}")
-        st.markdown(f"**Local:** {weather.get('city') or 'N?o identificado'}")
-        st.markdown(f"**Consulta:** {weather.get('captured_at') or '?'}")
+        st.markdown(f"**Origem:** {weather.get('source') or 'Não informada'}")
+        st.markdown(f"**Local:** {weather.get('city') or 'Não identificado'}")
+        st.markdown(f"**Consulta:** {weather.get('captured_at') or '—'}")
         return {"geo": geo_state, "weather": weather, "read_only": True}
 
     result: dict[str, Any] = {"geo": geo_state, "weather": weather}
@@ -160,11 +161,11 @@ def render_temperature_block(
         )
     with hint_col:
         if gps_lat is not None and gps_lon is not None:
-            st.caption(f"GPS dispon?vel: {float(gps_lat):.5f}, {float(gps_lon):.5f}.")
+            st.caption(f"GPS disponível: {float(gps_lat):.5f}, {float(gps_lon):.5f}.")
         elif geo_state.get("error"):
             st.caption(str(geo_state["error"]))
         else:
-            st.caption("Aguardando autoriza??o de localiza??o do dispositivo.")
+            st.caption("Aguardando autorização de localização do dispositivo.")
 
     with st.expander("Informar coordenadas manualmente", expanded=False):
         c1, c2 = st.columns(2)
@@ -222,16 +223,16 @@ def render_temperature_block(
         c1, c3 = st.columns(2)
         c2 = None
     with c1:
-        st.number_input("Temperatura externa (?C)", min_value=-20.0, max_value=70.0, value=None, step=0.1, key=ext_key)
+        st.number_input("Temperatura externa (°C)", min_value=-20.0, max_value=70.0, value=None, step=0.1, key=ext_key)
     if c2 is not None:
         with c2:
-            st.number_input("Temperatura interna medida (?C)", min_value=-20.0, max_value=70.0, value=None, step=0.1, key=int_key)
+            st.number_input("Temperatura interna medida (°C)", min_value=-20.0, max_value=70.0, value=None, step=0.1, key=int_key)
     with c3:
         st.number_input("Umidade relativa (%)", min_value=0.0, max_value=100.0, value=None, step=1.0, key=hum_key)
 
     if weather.get("captured_at"):
         st.caption(
-            f"Origem: {weather.get('source') or '?'} | Local: {weather.get('city') or 'N?o identificado'} | "
+            f"Origem: {weather.get('source') or '—'} | Local: {weather.get('city') or 'Não identificado'} | "
             f"Consulta: {weather.get('captured_at')}"
         )
 

@@ -1,8 +1,54 @@
 import base64
 import os
 import json
+import tempfile
 import uuid
 from datetime import datetime
+
+
+class StorageError(Exception):
+    """Erro de persistência com mensagem segura para exibição ao usuário."""
+
+
+def _load_json_file(path: str, label: str) -> dict:
+    """Carrega um arquivo JSON, falhando de forma explícita e amigável."""
+    try:
+        with open(path, "r", encoding="utf-8") as file:
+            data = json.load(file)
+    except FileNotFoundError:
+        return {}
+    except Exception as exc:
+        raise StorageError(
+            f"Não foi possível carregar {label}. "
+            "O arquivo pode estar corrompido; contate o administrador."
+        ) from exc
+    if not isinstance(data, dict):
+        raise StorageError(
+            f"Não foi possível carregar {label}. O formato do arquivo é inválido."
+        )
+    return data
+
+
+def _write_json_file(path: str, data: dict, label: str) -> None:
+    """Grava JSON de forma atômica para não corromper dados existentes."""
+    directory = os.path.dirname(path) or "."
+    os.makedirs(directory, exist_ok=True)
+    fd, temp_path = tempfile.mkstemp(prefix=".acn_", suffix=".tmp", dir=directory)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as file:
+            json.dump(data, file, ensure_ascii=False, indent=4)
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temp_path, path)
+    except Exception as exc:
+        try:
+            os.remove(temp_path)
+        except Exception:
+            pass
+        raise StorageError(
+            f"Não foi possível salvar {label}. "
+            "Verifique o espaço disponível e tente novamente."
+        ) from exc
 
 
 def _try_xano_sync_client(client: dict) -> dict:
@@ -34,6 +80,29 @@ def _try_xano_sync_visit(visit: dict, visits: dict = None) -> dict:
     except Exception:
         pass
     return visit
+
+
+def _try_xano_delete_client(client: dict) -> None:
+    """Desativa o cliente no Xano (best-effort), sem afetar a gravação local."""
+    try:
+        from src.xano_sync import delete_client as xano_delete_client, sync_enabled
+
+        if sync_enabled():
+            xano_delete_client(dict(client))
+    except Exception:
+        pass
+
+
+def _try_xano_delete_photo(photo: dict) -> None:
+    """Remove a fotografia no Xano (best-effort), sem afetar a gravação local."""
+    try:
+        from src.xano_sync import delete_photo as xano_delete_photo, sync_enabled
+
+        if sync_enabled():
+            xano_delete_photo(dict(photo))
+    except Exception:
+        pass
+
 
 from src.equipment_catalog import (
     DEFAULT_CATEGORY,
@@ -94,35 +163,23 @@ def init_storage():
     get_worker_photos_dir()
     get_signatures_dir()
     if not os.path.exists(CLIENTS_FILE):
-        with open(CLIENTS_FILE, "w", encoding="utf-8") as f:
-            json.dump({}, f, ensure_ascii=False, indent=4)
+        _write_json_file(CLIENTS_FILE, {}, "os dados de clientes")
     if not os.path.exists(VISITS_FILE):
-        with open(VISITS_FILE, "w", encoding="utf-8") as f:
-            json.dump({}, f, ensure_ascii=False, indent=4)
+        _write_json_file(VISITS_FILE, {}, "os dados de visitas")
 
 def load_clients() -> dict:
     init_storage()
-    try:
-        with open(CLIENTS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {}
+    return _load_json_file(CLIENTS_FILE, "os dados de clientes")
 
 def save_clients(clients: dict):
-    with open(CLIENTS_FILE, "w", encoding="utf-8") as f:
-        json.dump(clients, f, ensure_ascii=False, indent=4)
+    _write_json_file(CLIENTS_FILE, clients, "os dados de clientes")
 
 def load_visits() -> dict:
     init_storage()
-    try:
-        with open(VISITS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {}
+    return _load_json_file(VISITS_FILE, "os dados de visitas")
 
 def save_visits(visits: dict):
-    with open(VISITS_FILE, "w", encoding="utf-8") as f:
-        json.dump(visits, f, ensure_ascii=False, indent=4)
+    _write_json_file(VISITS_FILE, visits, "os dados de visitas")
 
 def add_client(name: str, cnpj: str, address: str, responsible: str, phone: str, email: str):
     clients = load_clients()
@@ -139,7 +196,10 @@ def add_client(name: str, cnpj: str, address: str, responsible: str, phone: str,
     }
     client = _try_xano_sync_client(client)
     clients[client_id] = client
-    save_clients(clients)
+    try:
+        save_clients(clients)
+    except StorageError as exc:
+        return False, None, str(exc)
     return True, client_id, "Cliente cadastrado com sucesso."
 
 def update_client(client_id: str, name: str, cnpj: str, address: str, responsible: str, phone: str, email: str):
@@ -155,15 +215,23 @@ def update_client(client_id: str, name: str, cnpj: str, address: str, responsibl
         "email": email.strip()
     })
     clients[client_id] = _try_xano_sync_client(clients[client_id])
-    save_clients(clients)
+    try:
+        save_clients(clients)
+    except StorageError as exc:
+        return False, str(exc)
     return True, "Cliente atualizado com sucesso."
 
 def delete_client(client_id: str):
     clients = load_clients()
     if client_id not in clients:
         return False, "Cliente não encontrado."
+    removed_client = dict(clients[client_id])
     del clients[client_id]
-    save_clients(clients)
+    try:
+        save_clients(clients)
+    except StorageError as exc:
+        return False, str(exc)
+    _try_xano_delete_client(removed_client)
     return True, "Cliente removido com sucesso."
 
 def _default_caderno_avaliacao() -> dict:
@@ -284,7 +352,10 @@ def add_visit(
     }
     visit = _try_xano_sync_visit(visit)
     visits[visit_id] = visit
-    save_visits(visits)
+    try:
+        save_visits(visits)
+    except StorageError as exc:
+        return False, None, str(exc)
     return True, visit_id, "Visita iniciada com sucesso."
 
 def update_visit(
@@ -352,7 +423,10 @@ def update_visit(
 
     visits[visit_id]["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     visits[visit_id] = _try_xano_sync_visit(visits[visit_id], visits)
-    save_visits(visits)
+    try:
+        save_visits(visits)
+    except StorageError as exc:
+        return False, str(exc)
     return True, "Visita salva com sucesso."
 
 
@@ -411,7 +485,10 @@ def save_visit_weather(
     visits[visit_id]["weather"] = weather
     visits[visit_id]["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     visits[visit_id] = _try_xano_sync_visit(visits[visit_id])
-    save_visits(visits)
+    try:
+        save_visits(visits)
+    except StorageError as exc:
+        return False, str(exc)
     return True, "Temperatura e umidade salvas com sucesso."
 
 
@@ -519,6 +596,24 @@ def get_visit_equipment(visit: dict) -> list[dict]:
     return result
 
 
+def first_pending_visit_step(visit: dict) -> int:
+    """Primeira etapa pendente do preenchimento de uma visita.
+
+    Etapas: 0 = identificação, 1 = equipamentos, 2 = caderno de avaliação.
+    Esta é a única fonte da regra, usada tanto pela lista de visitas quanto
+    pelo histórico de clientes (que antes usava índices de seções do formulário).
+    """
+    if not isinstance(visit, dict):
+        return 0
+    if not str(visit.get("client_id") or "").strip():
+        return 0
+    if not str(visit.get("date_start") or visit.get("date") or "").strip():
+        return 0
+    if not get_visit_equipment(visit):
+        return 1
+    return 2
+
+
 def get_visit_measurements(visit: dict) -> list[dict]:
     """Retorna as medições vinculadas aos equipamentos da visita."""
     if not isinstance(visit, dict):
@@ -609,7 +704,10 @@ def save_visit_equipment(visit_id: str, codes) -> tuple[bool, str]:
     visit["equipment"] = equipment
     visit["measurements"] = synced_measurements
     visit["updated_at"] = now
-    save_visits(visits)
+    try:
+        save_visits(visits)
+    except StorageError as exc:
+        return False, str(exc)
     return True, "Equipamentos da visita atualizados com sucesso."
 
 
@@ -683,7 +781,10 @@ def update_visit_measurement(visit_id: str, equipment_code: str, **fields) -> tu
     visit["measurements"] = measurements
     visit["equipment"] = equipment
     visit["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    save_visits(visits)
+    try:
+        save_visits(visits)
+    except StorageError as exc:
+        return False, str(exc)
     return True, "Medição atualizada com sucesso."
 
 
@@ -785,7 +886,10 @@ def save_visit_signature(
 
     if changed:
         visit["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        save_visits(visits)
+        try:
+            save_visits(visits)
+        except StorageError as exc:
+            return False, str(exc)
     return True, "Assinatura salva com sucesso."
 
 
@@ -811,7 +915,10 @@ def remove_visit_signature(visit_id: str, role: str) -> tuple[bool, str]:
             pass
     visits[visit_id]["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     visits[visit_id] = _try_xano_sync_visit(visits[visit_id])
-    save_visits(visits)
+    try:
+        save_visits(visits)
+    except StorageError as exc:
+        return False, str(exc)
     return True, "Assinatura removida com sucesso."
 
 
@@ -934,7 +1041,10 @@ def save_worker_photo(
     visits[visit_id]["worker_photo"] = saved_path
     visits[visit_id]["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     visits[visit_id] = _try_xano_sync_visit(visits[visit_id])
-    save_visits(visits)
+    try:
+        save_visits(visits)
+    except StorageError as exc:
+        return False, "", str(exc)
     return True, saved_path, "Foto do funcionário salva com sucesso."
 
 
@@ -961,7 +1071,10 @@ def remove_worker_photo(visit_id: str) -> tuple[bool, str]:
     visits[visit_id]["worker_photo"] = ""
     visits[visit_id]["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     visits[visit_id] = _try_xano_sync_visit(visits[visit_id])
-    save_visits(visits)
+    try:
+        save_visits(visits)
+    except StorageError as exc:
+        return False, str(exc)
     return True, "Foto do funcionário removida com sucesso."
 
 
@@ -979,7 +1092,10 @@ def update_worker_info(visit_id: str, name: str) -> tuple[bool, str]:
     visits[visit_id]["worker_name"] = clean_name
     visits[visit_id]["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     visits[visit_id] = _try_xano_sync_visit(visits[visit_id])
-    save_visits(visits)
+    try:
+        save_visits(visits)
+    except StorageError as exc:
+        return False, str(exc)
     return True, "Identificação do funcionário atualizada com sucesso."
 
 def _photo_registro(horario: str, equipment_label: str, identificacao_registro: str = "") -> str:
@@ -1045,7 +1161,10 @@ def add_photo_to_visit(
     visits[visit_id].setdefault("photos", []).append(photo_record)
     visits[visit_id]["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     visits[visit_id] = _try_xano_sync_visit(visits[visit_id])
-    save_visits(visits)
+    try:
+        save_visits(visits)
+    except StorageError as exc:
+        return False, str(exc)
     return True, "Fotografia anexada com sucesso."
 
 def replace_photo_in_visit(
@@ -1115,7 +1234,10 @@ def replace_photo_in_visit(
 
     visits[visit_id]["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     visits[visit_id] = _try_xano_sync_visit(visits[visit_id])
-    save_visits(visits)
+    try:
+        save_visits(visits)
+    except StorageError as exc:
+        return False, str(exc)
 
     if old_path and os.path.exists(old_path):
         try:
@@ -1170,7 +1292,10 @@ def update_photo_in_visit(
 
     visits[visit_id]["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     visits[visit_id] = _try_xano_sync_visit(visits[visit_id])
-    save_visits(visits)
+    try:
+        save_visits(visits)
+    except StorageError as exc:
+        return False, str(exc)
     return True, "Fotografia atualizada com sucesso."
 
 
@@ -1181,8 +1306,10 @@ def remove_photo_from_visit(visit_id: str, photo_id: str):
 
     photos = visits[visit_id].get("photos", [])
     updated_photos = []
+    removed_photo = None
     for p in photos:
         if p["id"] == photo_id:
+            removed_photo = dict(p)
             try:
                 if os.path.exists(p.get("path", "")):
                     os.remove(p["path"])
@@ -1194,5 +1321,10 @@ def remove_photo_from_visit(visit_id: str, photo_id: str):
     visits[visit_id]["photos"] = updated_photos
     visits[visit_id]["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     visits[visit_id] = _try_xano_sync_visit(visits[visit_id])
-    save_visits(visits)
+    try:
+        save_visits(visits)
+    except StorageError as exc:
+        return False, str(exc)
+    if removed_photo:
+        _try_xano_delete_photo(removed_photo)
     return True, "Fotografia removida com sucesso."

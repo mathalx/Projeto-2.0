@@ -1,7 +1,7 @@
-"""Seletor de equipamentos de Dosimetria de Ru?do (CHANGE 05).
+"""Seletor de equipamentos de Dosimetria de Ruído (CHANGE 05).
 
 Reaproveita ``src.equipment_catalog`` e ``src.storage_manager``.
-Cat?logo configur?vel; n?o inventa novos equipamentos.
+Catálogo configurável; não inventa novos equipamentos.
 """
 
 from __future__ import annotations
@@ -31,11 +31,11 @@ def render_equipment_block(
     key_prefix: str = "ve_eq",
     read_only: bool = False,
 ) -> dict:
-    """Renderiza sele??o m?ltipla por bot?es destac?veis e v?nculos de medi??o."""
-    st.markdown("#### Equipamentos ? Dosimetria de Ru?do")
+    """Renderiza seleção múltipla por botões destacáveis e vínculos de medição."""
+    st.markdown("#### Equipamentos — Dosimetria de Ruído")
     st.caption(
         "Selecione os equipamentos utilizados (Chrompack: 2386, 3440, 2319, 3558, 5981; Instrutherm: DOS-100X). "
-        "Cada equipamento selecionado fica associado ? visita e ? sua medi??o."
+        "Cada equipamento selecionado fica associado à visita e à sua medição."
     )
 
     selected = get_visit_equipment(visit)
@@ -74,7 +74,7 @@ def render_equipment_block(
     if not selected:
         st.info("Nenhum equipamento selecionado. Selecione pelo menos um para finalizar a visita.")
     else:
-        st.markdown("**Equipamentos selecionados e medi??es vinculadas**")
+        st.markdown("**Equipamentos selecionados e medições vinculadas**")
         for index, item in enumerate(selected, start=1):
             code = str(item.get("codigo"))
             measurement = measurements.get(code, {})
@@ -83,26 +83,26 @@ def render_equipment_block(
                 st.markdown(f"**{index}. {base_label}**")
                 if read_only:
                     registro = measurement.get("identificacao_registro") or base_label
-                    st.markdown(f"Identifica??o: {registro}")
-                    st.caption(f"Medi??o: {measurement.get('id', '?')}")
+                    st.markdown(f"Identificação: {registro}")
+                    st.caption(f"Medição: {measurement.get('id', '—')}")
                 else:
                     time_key = f"{key_prefix}_{visit_id}_{code}_time"
                     current_time = str(measurement.get("horario") or item.get("horario") or "")
                     if time_key not in st.session_state:
                         st.session_state[time_key] = current_time
                     st.text_input(
-                        "Hor?rio (HH:MM)", key=time_key, placeholder="08:30",
-                        help="Padr?o de identifica??o: hor?rio + equipamento.",
+                        "Horário (HH:MM)", key=time_key, placeholder="08:30",
+                        help="Padrão de identificação: horário + equipamento.",
                     )
                     horario = str(st.session_state.get(time_key, "") or "").strip()
-                    if st.button("Salvar hor?rio", key=f"{key_prefix}_{visit_id}_{code}_save_time"):
+                    if st.button("Salvar horário", key=f"{key_prefix}_{visit_id}_{code}_save_time"):
                         ok, msg = update_visit_measurement(visit_id, code, horario=horario)
                         if ok:
                             record_sync()
                             st.rerun()
                         else:
                             st.error(msg)
-                    registro = f"{horario} ? {base_label}" if horario else base_label
-                    st.caption(f"Identifica??o do registro: **{registro}** | Medi??o: {measurement.get('id', '?')}")
+                    registro = f"{horario} — {base_label}" if horario else base_label
+                    st.caption(f"Identificação do registro: **{registro}** | Medição: {measurement.get('id', '—')}")
 
     return {"selected": selected, "pending": validate_equipment_for_completion(visit)}

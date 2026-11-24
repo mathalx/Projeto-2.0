@@ -5,6 +5,9 @@ from collections import defaultdict
 import streamlit as st
 
 from src.components.photo_capture import clear_photo_input, photo_input
+from src.features.visit_enhancements.photographs.photo_manager import (
+    build_photo_identification,
+)
 from src.storage_manager import (
     add_photo_to_visit,
     get_visit_measurements,
@@ -25,6 +28,9 @@ from src.ui_components import (
     set_pending_state,
 )
 
+NO_EQUIPMENT_LABEL = "— Sem equipamento —"
+MANUAL_IDENTIFICATION_LABEL = "— Usar identificação manual —"
+
 
 def _visit_date_label(visit: dict) -> str:
     start = str(visit.get("date_start") or visit.get("date") or "").strip()
@@ -43,7 +49,7 @@ def _photo_date(photo: dict, visit: dict) -> str:
 
 def _equipment_label_options(visit: dict):
     # Retorna labels de equipamento disponíveis (padrão horário + identificação).
-    options = ["? Sem equipamento ?"]
+    options = [NO_EQUIPMENT_LABEL]
     seen = set()
     for measurement in get_visit_measurements(visit):
         registro = str(
@@ -67,7 +73,7 @@ def _equipment_label_options(visit: dict):
 
 
 def _measurement_registro_options(visit: dict):
-    options = {"? Usar identifica??o manual ?": ("", "")}
+    options = {MANUAL_IDENTIFICATION_LABEL: ("", "")}
     for measurement in get_visit_measurements(visit):
         code = str(measurement.get("equipment_code") or "")
         registro = str(
@@ -83,14 +89,6 @@ def _measurement_registro_options(visit: dict):
         if registro:
             options[registro] = (code, label)
     return options
-
-
-def _build_identificacao(horario: str, equipment_label: str) -> str:
-    horario = str(horario or "").strip()
-    equipment_label = str(equipment_label or "").strip()
-    if horario and equipment_label:
-        return f"{horario} — {equipment_label}"
-    return equipment_label or horario
 
 
 def _select_photos_tab() -> str:
@@ -134,14 +132,14 @@ def _get_image_source(selected_v_id: str):
 
 def _render_upload(selected_v_id: str, visit: dict):
     render_section_title(
-        "Adicionar fotografia ? visita",
-        "Tire uma fotografia pela c?mera ou selecione uma imagem existente. Registre hor?rio, equipamento, legenda e observa??es.",
-        "??",
+        "Adicionar fotografia à visita",
+        "Tire uma fotografia pela câmera ou selecione uma imagem existente. Registre horário, equipamento, legenda e observações.",
+        "📷",
     )
 
     st.caption(
-        f"Visita relacionada: #{selected_v_id} ? {visit.get('client_name', '?')} ({_visit_date_label(visit)}). "
-        "As fotografias capturadas ou enviadas utilizam a mesma galeria, organiza??o e armazenamento desta visita."
+        f"Visita relacionada: #{selected_v_id} — {visit.get('client_name', '—')} ({_visit_date_label(visit)}). "
+        "As fotografias capturadas ou enviadas utilizam a mesma galeria, organização e armazenamento desta visita."
     )
 
     nonce = st.session_state.get("photo_upload_nonce", 0)
@@ -150,54 +148,54 @@ def _render_upload(selected_v_id: str, visit: dict):
     equipment_labels = _equipment_label_options(visit)
 
     if file_bytes is not None:
-        st.markdown("#### Pr?-visualiza??o e confirma??o")
-        st.image(file_bytes, caption="Pr?-visualiza??o (n?o salva automaticamente)", width="stretch")
+        st.markdown("#### Pré-visualização e confirmação")
+        st.image(file_bytes, caption="Pré-visualização (não salva automaticamente)", width="stretch")
 
         col1, col2 = st.columns(2)
         with col1:
             horario = st.text_input(
-                "Hor?rio da fotografia (HH:MM)",
+                "Horário da fotografia (HH:MM)",
                 key=f"photo_time_{nonce}",
                 placeholder="08:30",
             )
         with col2:
-            # Sugere equipamento a partir dos registros/medi??es da visita
+            # Sugere equipamento a partir dos registros/medições da visita
             registro_choice = st.selectbox(
                 "Equipamento identificado na visita",
                 list(registro_options.keys()),
                 key=f"photo_reg_choice_{nonce}",
-                help="Selecione um registro de equipamento da visita (padr?o hor?rio + identifica??o) ou informe manualmente.",
+                help="Selecione um registro de equipamento da visita (padrão horário + identificação) ou informe manualmente.",
             )
 
         manual_equipment = st.selectbox(
-            "Equipamento utilizado (identifica??o)",
+            "Equipamento utilizado (identificação)",
             equipment_labels,
             key=f"photo_equip_label_{nonce}",
-            help="Usado quando a identifica??o for manual.",
+            help="Usado quando a identificação for manual.",
         )
 
         identificacao_preview = ""
         selected_code, selected_equip_label = registro_options.get(registro_choice, ("", ""))
-        if registro_choice != "? Usar identifica??o manual ?":
-            base = selected_equip_label or registro_choice.split("?", 1)[-1].strip()
-            identificacao_preview = _build_identificacao(horario, base) or registro_choice
+        if registro_choice != MANUAL_IDENTIFICATION_LABEL:
+            base = selected_equip_label or registro_choice.split("—", 1)[-1].strip()
+            identificacao_preview = build_photo_identification(horario, base) or registro_choice
         else:
-            eq_label = "" if manual_equipment == "? Sem equipamento ?" else manual_equipment
-            identificacao_preview = _build_identificacao(horario, eq_label)
+            eq_label = "" if manual_equipment == NO_EQUIPMENT_LABEL else manual_equipment
+            identificacao_preview = build_photo_identification(horario, eq_label)
 
         st.caption(
-            f"Padr?o de identifica??o: **{identificacao_preview or 'Hor?rio + identifica??o do equipamento'}**"
+            f"Padrão de identificação: **{identificacao_preview or 'Horário + identificação do equipamento'}**"
         )
 
         caption = st.text_input(
             "Legenda da fotografia *",
             key=f"photo_caption_{nonce}",
-            placeholder="Ex: Medi??o no setor de prensagem",
+            placeholder="Ex: Medição no setor de prensagem",
         )
         observations = st.text_area(
-            "Observa??es",
+            "Observações",
             key=f"photo_obs_{nonce}",
-            placeholder="Observa??es adicionais sobre a fotografia/registro",
+            placeholder="Observações adicionais sobre a fotografia/registro",
         )
 
         save_col, retry_col, cancel_col = st.columns(3)
@@ -211,14 +209,14 @@ def _render_upload(selected_v_id: str, visit: dict):
                 if not caption.strip():
                     st.error("Escreva uma legenda para identificar a fotografia.")
                 else:
-                    if registro_choice != "? Usar identifica??o manual ?":
-                        base = selected_equip_label or registro_choice.split("?", 1)[-1].strip()
+                    if registro_choice != MANUAL_IDENTIFICATION_LABEL:
+                        base = selected_equip_label or registro_choice.split("—", 1)[-1].strip()
                         eq_label = base
                         eq_code = selected_code
                     else:
-                        eq_label = "" if manual_equipment == "? Sem equipamento ?" else manual_equipment
+                        eq_label = "" if manual_equipment == NO_EQUIPMENT_LABEL else manual_equipment
                         eq_code = ""
-                    registro = _build_identificacao(horario, eq_label)
+                    registro = build_photo_identification(horario, eq_label)
                     with st.spinner("Salvando fotografia..."):
                         success, _message = add_photo_to_visit(
                             selected_v_id,
@@ -275,7 +273,7 @@ def _render_photo_card(selected_v_id: str, photo: dict, visit: dict):
             f'<div class="acn-photo-caption"><b>Legenda:</b> {html.escape(photo.get("description") or "Sem legenda")}</div>',
             unsafe_allow_html=True,
         )
-        registro = photo.get("identificacao_registro") or _build_identificacao(
+        registro = photo.get("identificacao_registro") or build_photo_identification(
             photo.get("horario", ""), photo.get("equipment_label", "")
         )
         if registro:
@@ -323,7 +321,7 @@ def _render_photo_card(selected_v_id: str, photo: dict, visit: dict):
                 key=f"edit_equip_{photo_id}",
                 placeholder="Ex.: Dosímetro 3440",
             )
-            st.caption(f"Padrão: **{_build_identificacao(e_horario, e_equip) or '—'}**")
+            st.caption(f"Padrão: **{build_photo_identification(e_horario, e_equip) or '—'}**")
             e_caption = st.text_input(
                 "Legenda",
                 value=photo.get("description", ""),
@@ -338,7 +336,7 @@ def _render_photo_card(selected_v_id: str, photo: dict, visit: dict):
                 if not e_caption.strip():
                     st.error("A legenda é obrigatória.")
                 else:
-                    registro = _build_identificacao(e_horario, e_equip)
+                    registro = build_photo_identification(e_horario, e_equip)
                     success, _ = update_photo_in_visit(
                         selected_v_id,
                         photo_id,
@@ -390,7 +388,7 @@ def _render_photo_card(selected_v_id: str, photo: dict, visit: dict):
                 elif not r_caption.strip():
                     st.error("Escreva uma legenda para a fotografia.")
                 else:
-                    registro = _build_identificacao(r_horario, r_equip)
+                    registro = build_photo_identification(r_horario, r_equip)
                     with st.spinner("Substituindo fotografia..."):
                         success, _message = replace_photo_in_visit(
                             selected_v_id,

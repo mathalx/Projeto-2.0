@@ -403,6 +403,34 @@ def sync_client(local_client: dict, client: XanoClient | None = None, token: str
     return local_client
 
 
+def delete_client(local_client: Mapping[str, Any], client: XanoClient | None = None,
+                  token: str | None = None) -> bool:
+    """Desativa o cliente no Xano (exclusão lógica), sem duplicar registros."""
+    owns = client is None
+    if owns:
+        if not sync_enabled(token):
+            return False
+        client = _client(token)
+    assert client is not None
+    try:
+        xano_id = local_client.get("xano_id")
+        if not xano_id:
+            existing = find_remote_client(client, local_client)
+            xano_id = (existing or {}).get("id")
+        if xano_id:
+            client.delete(f"/clients/{int(xano_id)}")
+            return True
+    except Exception as exc:
+        _log(f"falha ao desativar cliente {local_client.get('id')}: {exc}")
+    finally:
+        if owns:
+            try:
+                client.close()
+            except Exception:
+                pass
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Visitas
 # ---------------------------------------------------------------------------
@@ -436,6 +464,20 @@ def _is_finalized_remote(remote: Mapping[str, Any] | None) -> bool:
     if not isinstance(remote, Mapping):
         return False
     return _as_text(remote.get("status")).strip().lower() == "finalizado"
+
+
+def _finalize_visit_remote(client: XanoClient, xano_visit_id: int) -> bool:
+    """Finaliza a visita no Xano usando o endpoint documentado (best-effort)."""
+    try:
+        data = client.get(f"/visits/{int(xano_visit_id)}")
+        remote = data.get("visit") if isinstance(data, dict) and isinstance(data.get("visit"), dict) else data
+        if _is_finalized_remote(remote):
+            return True
+        client.post(f"/visits/{int(xano_visit_id)}/finalize")
+        return True
+    except Exception as exc:
+        _log(f"falha ao finalizar visita {xano_visit_id} no Xano: {exc}")
+        return False
 
 
 def sync_visit(local_visit: dict, client: XanoClient | None = None, token: str | None = None,
@@ -507,6 +549,12 @@ def sync_visit(local_visit: dict, client: XanoClient | None = None, token: str |
 
         local_visit["xano_status"] = _as_text((remote or {}).get("status"))
         local_visit["xano_synced_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Finalização é uma transição explícita no Xano; o PATCH acima envia os
+        # dados, mas o endpoint /finalize aplica a regra de negócio remota.
+        if _xano_status(local_visit.get("status")) == "finalizado":
+            if _finalize_visit_remote(client, int(xano_visit_id)):
+                local_visit["xano_status"] = "finalizado"
 
         # Sincroniza fotografias vinculadas.
         sync_visit_photos(local_visit, client=client)
@@ -605,6 +653,32 @@ def sync_visit_photos(local_visit: dict, client: XanoClient) -> None:
                 photo["xano_synced_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         except Exception as exc:
             _log(f"falha ao sincronizar foto {photo.get('id')} da visita {xano_visit_id}: {exc}")
+
+
+def delete_photo(local_photo: Mapping[str, Any], client: XanoClient | None = None,
+                 token: str | None = None) -> bool:
+    """Remove no Xano a fotografia já excluída localmente (best-effort)."""
+    owns = client is None
+    if owns:
+        if not sync_enabled(token):
+            return False
+        client = _client(token)
+    assert client is not None
+    try:
+        xano_id = local_photo.get("xano_id")
+        if xano_id:
+            client.delete(f"/photos/{int(xano_id)}")
+            return True
+    except Exception as exc:
+        _log(f"falha ao excluir foto {local_photo.get('id')} no Xano: {exc}")
+    finally:
+        if owns:
+            try:
+                client.close()
+            except Exception:
+                pass
+    return False
+
 
 # ---------------------------------------------------------------------------
 # Recuperação (Xano -> local)
@@ -903,6 +977,8 @@ def test_persistence(token: str | None = None) -> dict[str, Any]:
 
 __all__ = [
     "EXT_KEY",
+    "delete_client",
+    "delete_photo",
     "fetch_visit",
     "pull_visits",
     "sync_client",

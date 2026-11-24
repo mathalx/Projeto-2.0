@@ -3,18 +3,21 @@ from datetime import date
 
 import streamlit as st
 
-from src.form_template import first_unanswered_section, visit_completion
+from src.form_template import visit_completion
 from src.storage_manager import (
     add_client,
     add_visit,
     delete_client,
+    first_pending_visit_step,
     load_clients,
     load_visits,
+    update_client,
 )
 from src.ui_components import (
     CLIENTS_TAB_CONSULT,
     CLIENTS_TAB_LIST,
     CLIENTS_TAB_NEW,
+    PAGE_CLIENTS,
     CLIENTS_TABS,
     PAGE_VISITS,
     VISITS_TAB_FILL,
@@ -42,9 +45,12 @@ def _select_clients_tab() -> str:
     )
 
 
-def _open_visit(visit_id: str, forms: dict):
+def _open_visit(visit: dict):
+    """Abre a visita na primeira etapa de preenchimento realmente pendente."""
+    visit_id = str(visit.get("id", ""))
     st.session_state["active_visit_id"] = visit_id
-    st.session_state[f"form_step_{visit_id}"] = first_unanswered_section(forms)
+    st.session_state["draft_loaded_vid"] = None
+    st.session_state[f"form_step_{visit_id}"] = first_pending_visit_step(visit)
     navigate_to(PAGE_VISITS, visits_tab=VISITS_TAB_FILL)
 
 
@@ -99,7 +105,7 @@ def _render_client_list(clients: dict, visits: dict):
             client_visits = [v for v in visits.values() if v.get("client_id") == c_id]
             st.markdown(f"📊 **Visitas registradas:** {len(client_visits)}")
 
-            b_col1, b_col2, _ = st.columns([1.4, 1.1, 2.5])
+            b_col1, b_col2, b_col3 = st.columns([1.4, 1.1, 1.4])
             with b_col1:
                 if st.button("🚀 Iniciar visita", key=f"start_visit_{c_id}", width="stretch"):
                     success, visit_id, message = add_visit(
@@ -110,12 +116,15 @@ def _render_client_list(clients: dict, visits: dict):
                     if success:
                         record_sync()
                         set_flash(f"Visita iniciada para {client.get('name')}. Continue o preenchimento.")
-                        _open_visit(visit_id, {})
+                        _open_visit({"id": visit_id})
                     else:
                         st.error("Não foi possível iniciar a visita. Tente novamente.")
             with b_col2:
                 if st.button("🗑️ Excluir", key=f"del_client_{c_id}", width="stretch"):
                     st.session_state["client_delete_pending"] = c_id
+            with b_col3:
+                if st.button("✏️ Editar dados", key=f"edit_client_{c_id}", width="stretch"):
+                    st.session_state["client_edit_target"] = c_id
 
             if st.session_state.get("client_delete_pending") == c_id:
                 st.warning(
@@ -136,6 +145,73 @@ def _render_client_list(clients: dict, visits: dict):
                     if st.button("Cancelar", key=f"cancel_del_{c_id}", width="stretch"):
                         st.session_state.pop("client_delete_pending", None)
                         st.rerun()
+
+            edit_expanded = st.session_state.get("client_edit_target") == c_id
+            with st.expander("✏️ Editar cadastro do cliente", expanded=edit_expanded):
+                with st.form(f"edit_client_form_{c_id}"):
+                    e_name = st.text_input(
+                        "Nome da empresa *",
+                        value=str(client.get("name") or ""),
+                        key=f"edit_client_name_{c_id}",
+                    )
+                    e_cnpj = st.text_input(
+                        "CNPJ *",
+                        value=str(client.get("cnpj") or ""),
+                        key=f"edit_client_cnpj_{c_id}",
+                    )
+                    e_address = st.text_input(
+                        "Endereço completo *",
+                        value=str(client.get("address") or ""),
+                        key=f"edit_client_address_{c_id}",
+                    )
+                    e_resp = st.text_input(
+                        "Responsável técnico / contato *",
+                        value=str(client.get("responsible") or ""),
+                        key=f"edit_client_responsible_{c_id}",
+                    )
+                    e_phone = st.text_input(
+                        "Telefone *",
+                        value=str(client.get("phone") or ""),
+                        key=f"edit_client_phone_{c_id}",
+                    )
+                    e_email = st.text_input(
+                        "E-mail *",
+                        value=str(client.get("email") or ""),
+                        key=f"edit_client_email_{c_id}",
+                    )
+                    save_col, cancel_edit_col = st.columns([1, 1])
+                    with save_col:
+                        submitted = st.form_submit_button(
+                            "Salvar alterações", type="primary", width="stretch"
+                        )
+                    with cancel_edit_col:
+                        cancel_edit = st.form_submit_button(
+                            "Fechar", width="stretch"
+                        )
+                if cancel_edit:
+                    st.session_state.pop("client_edit_target", None)
+                    st.rerun()
+                if submitted:
+                    values = [e_name, e_cnpj, e_address, e_resp, e_phone, e_email]
+                    if any(not str(value).strip() for value in values):
+                        st.error("Preencha todos os campos obrigatórios.")
+                    elif any(
+                        other_id != c_id
+                        and str(other.get("cnpj", "")).strip() == e_cnpj.strip()
+                        for other_id, other in clients.items()
+                    ):
+                        st.error("Já existe um cliente cadastrado com este CNPJ.")
+                    else:
+                        success, message = update_client(
+                            c_id, e_name, e_cnpj, e_address, e_resp, e_phone, e_email
+                        )
+                        if success:
+                            st.session_state.pop("client_edit_target", None)
+                            record_sync()
+                            set_flash(message)
+                            st.rerun()
+                        else:
+                            st.error(message)
 
 
 def _render_new_client(clients: dict):
@@ -212,6 +288,10 @@ def _render_consult(clients: dict, visits: dict):
         st.markdown(f"**Endereço:** {client.get('address', '—')}")
         st.markdown(f"**Contato:** {client.get('phone', '—')} / {client.get('email', '—')}")
 
+    if st.button("✏️ Editar cadastro", key=f"consult_edit_{selected_id}", width="stretch"):
+        st.session_state["client_edit_target"] = selected_id
+        navigate_to(PAGE_CLIENTS, clients_tab=CLIENTS_TAB_LIST)
+
     st.markdown("#### Histórico de visitas técnicas")
     client_visits = [v for v in visits.values() if v.get("client_id") == selected_id]
     if not client_visits:
@@ -233,7 +313,7 @@ def _render_consult(clients: dict, visits: dict):
             unsafe_allow_html=True,
         )
         if st.button("✍️ Abrir visita", key=f"open_visit_{v_id}", width="stretch"):
-            _open_visit(v_id, visit.get("forms", {}))
+            _open_visit(visit)
 
 
 def render_clients_view():

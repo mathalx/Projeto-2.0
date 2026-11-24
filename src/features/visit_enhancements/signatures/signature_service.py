@@ -1,7 +1,7 @@
-"""Servi?o/bloco de assinaturas (CHANGE 04).
+"""Serviço/bloco de assinaturas (CHANGE 04).
 
 Reaproveita ``src.signature_pad`` e ``src.storage_manager``.
-N?o declara validade jur?dica autom?tica.
+Não declara validade jurídica automática.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ def _saved_signature_data_url(signature: dict) -> str:
 
 
 def validate_signatures_for_completion(visit: dict) -> list[str]:
-    """Retorna r?tulos das assinaturas pendentes (ambas obrigat?rias para concluir)."""
+    """Retorna rótulos das assinaturas pendentes (ambas obrigatórias para concluir)."""
     return missing_signatures(visit)
 
 
@@ -53,28 +53,28 @@ def render_signatures_block(
     read_only: bool = False,
     allow_draft_without_signatures: bool = True,
 ) -> dict:
-    """Renderiza bloco com Respons?vel T?cnico e Avaliador."""
-    _ = allow_draft_without_signatures  # regra aplicada no fluxo de finaliza??o
+    """Renderiza bloco com Responsável Técnico e Avaliador."""
+    _ = allow_draft_without_signatures  # regra aplicada no fluxo de finalização
     signatures = _signatures_of(visit)
 
     st.markdown("#### Assinaturas")
     st.caption(
-        "Respons?vel T?cnico e Avaliador: informe nome e desenhe a assinatura (mouse ou toque). "
-        "As duas assinaturas s?o obrigat?rias para concluir a visita, mas rascunhos podem ser salvos sem elas. "
-        "Registro eletr?nico sem validade jur?dica autom?tica."
+        "Responsável Técnico e Avaliador: informe nome e desenhe a assinatura (mouse ou toque). "
+        "As duas assinaturas são obrigatórias para concluir a visita, mas rascunhos podem ser salvos sem elas. "
+        "Registro eletrônico sem validade jurídica automática."
     )
 
     if read_only:
         for role in SIGNATURE_ROLES:
             label = SIGNATURE_LABELS[role]
             signature = signatures.get(role) if isinstance(signatures.get(role), dict) else {}
-            name = str(signature.get("name") or "").strip() or "N?o informado"
+            name = str(signature.get("name") or "").strip() or "Não informado"
             st.markdown(f"**{label}:** {name}")
             if visit_has_signature(visit, role):
-                st.caption(f"Assinado em {signature.get('signed_at') or 'data n?o informada'}.")
+                st.caption(f"Assinado em {signature.get('signed_at') or 'data não informada'}.")
                 st.image(signature.get("path"), width=320)
             else:
-                st.caption("N?o assinado.")
+                st.caption("Não assinado.")
         return {"pending": validate_signatures_for_completion(visit), "read_only": True}
 
     def _on_name_change(vid: str, role: str, nkey: str):
@@ -113,11 +113,11 @@ def render_signatures_block(
                 on_change=partial(_on_draw_change, visit_id, role, pad_key),
             )
             if visit_has_signature(visit, role):
-                st.caption(f"Assinatura registrada em {signature.get('signed_at') or 'data n?o informada'}.")
+                st.caption(f"Assinatura registrada em {signature.get('signed_at') or 'data não informada'}.")
                 with st.expander("Visualizar assinatura salva", expanded=False):
                     st.image(signature.get("path"), width=320)
             else:
-                st.caption("Ainda n?o assinado.")
+                st.caption("Ainda não assinado.")
 
     if st.button("Salvar assinaturas", key=f"{key_prefix}_{visit_id}_save", width="stretch"):
         # persiste nomes e desenhos presentes no estado atual
@@ -136,7 +136,7 @@ def render_signatures_block(
             set_flash("Assinaturas salvas.")
             st.rerun()
         else:
-            st.error("N?o foi poss?vel salvar as assinaturas.")
+            st.error("Não foi possível salvar as assinaturas.")
 
     error = st.session_state.pop(f"{key_prefix}_error", None)
     if error:

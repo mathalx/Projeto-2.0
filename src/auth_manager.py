@@ -2,6 +2,7 @@ import os
 import json
 import hashlib
 import binascii
+from datetime import datetime
 
 DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data"))
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
@@ -29,24 +30,25 @@ def init_db():
     """Ensure data directory and initial users exist."""
     os.makedirs(DATA_DIR, exist_ok=True)
     if not os.path.exists(USERS_FILE):
+        created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         initial_users = {
             "Ana.norte": {
                 "password": hash_password("123456789"),
                 "active": True,
                 "is_admin": True,
-                "created_at": "2026-03-30"
+                "created_at": created_at
             },
             "anaju.mãe": {
                 "password": hash_password("123456789"),
                 "active": True,
                 "is_admin": False,
-                "created_at": "2026-03-30"
+                "created_at": created_at
             },
             "anaju.pai": {
                 "password": hash_password("123456789"),
                 "active": True,
                 "is_admin": False,
-                "created_at": "2026-03-30"
+                "created_at": created_at
             }
         }
         save_users(initial_users)
@@ -86,7 +88,7 @@ def add_user(username: str, password: str, is_admin: bool = False):
         "password": hash_password(password),
         "active": True,
         "is_admin": is_admin,
-        "created_at": "2026-03-30"
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
     save_users(users)
     return True, "Usuário cadastrado com sucesso."
@@ -120,6 +122,8 @@ def toggle_user_status(username: str):
     if username not in users:
         return False, "Usuário não encontrado."
     current = users[username].get("active", True)
+    if username == "Ana.norte" and current:
+        return False, "Não é permitido desativar o usuário administrador principal."
     users[username]["active"] = not current
     save_users(users)
     status_text = "ativado" if not current else "desativado"

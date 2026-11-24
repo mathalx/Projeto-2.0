@@ -33,7 +33,10 @@ def generate_pdf_report(visit_id: str) -> str:
         
     visit = visits[visit_id]
     client_id = visit.get("client_id")
-    client = clients.get(client_id, {})
+    # Visitantes históricos podem referenciar uma empresa que não está mais no
+    # cadastro; o nome salvo na visita preserva a identificação do registro.
+    client = clients.get(client_id) or {}
+    client_name = client.get("name") or visit.get("client_name") or "N/A"
     
     pdf_filename = f"Relatorio_Visita_{visit_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     pdf_path = os.path.join(EXPORTS_DIR, pdf_filename)
@@ -121,7 +124,7 @@ def generate_pdf_report(visit_id: str) -> str:
     if not status_display or status_display.upper() == 'N/A':
         status_display = 'Não visitado'
     client_data = [
-        [Paragraph("<b>Empresa Cliente:</b>", bold_style), Paragraph(client.get('name', 'N/A'), normal_style)],
+        [Paragraph("<b>Empresa Cliente:</b>", bold_style), Paragraph(client_name, normal_style)],
         [Paragraph("<b>CNPJ:</b>", bold_style), Paragraph(client.get('cnpj', 'N/A'), normal_style)],
         [Paragraph("<b>Endereço:</b>", bold_style), Paragraph(client.get('address', 'N/A'), normal_style)],
         [Paragraph("<b>Responsável na Empresa:</b>", bold_style), Paragraph(client.get('responsible', 'N/A'), normal_style)],
@@ -210,7 +213,7 @@ def generate_pdf_report(visit_id: str) -> str:
             val = str(caderno.get(key) or "").strip()
             return val if val else fallback
 
-        empresa_c = _cval("empresa_avaliada", client.get('name', '—'))
+        empresa_c = _cval("empresa_avaliada", client_name if client_name != "N/A" else "—")
         unidade_c = _cval("unidade")
         estado_c = _cval("estado")
         bloco_a = [

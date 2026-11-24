@@ -8,6 +8,7 @@ O projeto segue uma arquitetura modular baseada em responsabilidades:
 
 - `src/`: Aplicação Streamlit (ponto de entrada, autenticação, navegação, armazenamento e exportações).
   - `views/`: Telas da aplicação (login, painel, clientes, visitas, fotografias, relatórios e administração).
+  - `features/visit_enhancements/`: Blocos modulares reutilizáveis de visitas (temperatura, assinaturas, equipamentos, fluxo do formulário, fotografias, relatórios e integração). Registrados em `src/features/__init__.py` e inicializados pelo `src/main.py`; acessíveis na tela de preenchimento de visitas em modo consulta.
   - `modules/authentication/`: Camada de autenticação integrada ao Xano e contas locais.
   - `core/database/`: Cliente HTTP e integração com Xano.
 - `data/`: Armazenamento local de usuários, clientes, visitas, fotografias e exportações.

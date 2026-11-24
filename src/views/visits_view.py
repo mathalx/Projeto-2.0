@@ -7,6 +7,10 @@ from functools import partial
 import streamlit as st
 
 from src.equipment_catalog import equipment_grouped, equipment_label
+from src.features.visit_enhancements.integration import (
+    finalize_visit_guard,
+    render_visit_enhancements_panel,
+)
 from src.form_template import (
     TECHNICAL_FORM_SECTIONS,
     UNANSWERED_LABEL,
@@ -30,13 +34,12 @@ from src.storage_manager import (
     get_visit_measurements,
     load_clients,
     load_visits,
-    missing_equipment,
-    missing_signatures,
     remove_worker_photo,
     save_visit_equipment,
     save_visit_signature,
     save_visit_weather,
     save_worker_photo,
+    first_pending_visit_step,
     update_visit,
     update_visit_measurement,
     update_worker_info,
@@ -259,13 +262,8 @@ def _build_draft(visit: dict) -> dict:
 
 
 def _first_pending_step(visit: dict) -> int:
-    if not visit.get("client_id"):
-        return FILL_STEP_IDENTIFICACAO
-    if not (visit.get("date_start") or visit.get("date")):
-        return FILL_STEP_IDENTIFICACAO
-    if not get_visit_equipment(visit):
-        return FILL_STEP_EQUIPAMENTOS
-    return FILL_STEP_CADERNO
+    """Usa a regra compartilhada de etapas pendentes (0/1/2)."""
+    return first_pending_visit_step(visit)
 
 
 def _collect_widgets(visit_id: str, draft: dict) -> dict:
@@ -379,6 +377,52 @@ def _open_visit_for_editing(visit: dict, step: int = None):
 # ---------------------------------------------------------------------------
 # Lista de visitas / ETAPA 1 VISITAS (empresas e visitas relacionadas)
 # ---------------------------------------------------------------------------
+def _render_orphan_visits(visits: dict, clients: dict):
+    """Exibe visitas cuja empresa não está mais cadastrada, sem apagar dados."""
+    client_ids = {str(cid) for cid in clients}
+    orphans = [
+        (v_id, visit)
+        for v_id, visit in visits.items()
+        if str(visit.get("client_id") or "") not in client_ids
+    ]
+    if not orphans:
+        return
+
+    orphans.sort(
+        key=lambda item: str(item[1].get("date_start") or item[1].get("date") or ""),
+        reverse=True,
+    )
+    st.markdown("---")
+    with st.expander(
+        f"🗂️ Visitas sem empresa vinculada ({len(orphans)}) — registros preservados",
+        expanded=False,
+    ):
+        st.info(
+            "Estas visitas pertencem a empresas que não estão mais no cadastro. "
+            "Nenhum dado foi removido: abra a visita para consultar ou selecione uma "
+            "empresa ativa na etapa de identificação, se desejar vincular o registro."
+        )
+        for v_id, visit in orphans:
+            status = _display_status(visit.get("status", "Rascunho"))
+            ident = visit_identification_label({**visit, "id": v_id})
+            with st.container(border=True):
+                st.markdown(f"**{ident}**")
+                st.markdown(
+                    f"Código: `{v_id}` &nbsp;|&nbsp; Situação: {status_badge(status)}",
+                    unsafe_allow_html=True,
+                )
+                st.caption(
+                    f"Empresa no registro: {str(visit.get('client_name') or '—')} "
+                    f"(código: {str(visit.get('client_id') or '—')})"
+                )
+                if st.button(
+                    "Abrir visita preservada",
+                    key=f"open_orphan_{v_id}",
+                    width="stretch",
+                ):
+                    _open_visit_for_editing({**visit, "id": v_id})
+
+
 def _render_visits_overview(visits: dict, clients: dict):
     render_section_title(
         "Visitas — Empresas e visitas relacionadas",
@@ -416,6 +460,7 @@ def _render_visits_overview(visits: dict, clients: dict):
         )
         if st.button("Ir para cadastro de clientes", key="visits_overview_go_clients", type="primary"):
             navigate_to(PAGE_CLIENTS, clients_tab=CLIENTS_TAB_NEW)
+        _render_orphan_visits(visits, clients)
         return
 
     client_items.sort(key=lambda item: str(item[1].get("name", "")).lower())
@@ -489,6 +534,8 @@ def _render_visits_overview(visits: dict, clients: dict):
                                     width="stretch",
                                 ):
                                     _open_visit_for_editing({**visit, "id": v_id}, step=FILL_STEP_CADERNO)
+
+    _render_orphan_visits(visits, clients)
 
     st.markdown("---")
     st.caption("Selecione uma empresa para visualizar suas visitas, criar uma nova visita vinculada, abrir ou continuar uma visita.")
@@ -1592,16 +1639,14 @@ def _render_caderno_step(visit_id: str, visit: dict, draft: dict):
                 _persist_draft(visit_id, draft)
                 pending = _validate_required(draft["forms"])
                 fresh_visit2 = load_visits().get(visit_id, visit)
-                pending_equipment = missing_equipment(fresh_visit2)
-                pending_signatures = missing_signatures(fresh_visit2)
+                # Validação compartilhada com o pacote modular de extensões.
+                equipment_and_signatures_ok, extra_problems = finalize_visit_guard(fresh_visit2)
                 problems = []
                 if pending:
                     detail = "; ".join(f"{title}: {count} pendente(s)" for title, count in pending)
                     problems.append(f"Checklist técnico pendente: {detail}.")
-                if pending_equipment:
-                    problems.append("Equipamentos pendentes: " + ", ".join(pending_equipment) + ".")
-                if pending_signatures:
-                    problems.append("Assinaturas pendentes: " + ", ".join(pending_signatures) + ".")
+                if not equipment_and_signatures_ok:
+                    problems.extend(f"{problem}." for problem in extra_problems)
                 if problems:
                     st.error(" ".join(problems))
                 else:
@@ -1642,6 +1687,45 @@ def _render_progress(visit_id: str, draft: dict, step: int):
         f"{FILL_STEP_TITLES.get(step, 'Etapa')} • Etapa {step + 1} de {FILL_TOTAL_STEPS} — "
         "os dados são salvos automaticamente."
     )
+
+
+def _render_modular_resources(visit_id: str) -> None:
+    """Exibe os blocos modulares em consulta, sem duplicar os campos editáveis.
+
+    As etapas acima continuam sendo a única interface de edição. Este painel é
+    carregado sob demanda e usa os mesmos serviços de armazenamento do fluxo
+    principal, em modo somente leitura.
+    """
+    panel_key = f"show_visit_enhancements_{visit_id}"
+    with st.expander("🔧 Recursos modulares da visita (consulta)", expanded=False):
+        if not st.session_state.get(panel_key, False):
+            st.caption(
+                "Resumo, condições ambientais, equipamentos, assinaturas e fotografias "
+                "reaproveitando os serviços existentes, em modo somente leitura."
+            )
+            if st.button(
+                "Carregar recursos modulares",
+                key=f"load_enhancements_{visit_id}",
+                width="stretch",
+            ):
+                st.session_state[panel_key] = True
+                st.rerun()
+            return
+
+        if st.button(
+            "Ocultar recursos modulares",
+            key=f"hide_enhancements_{visit_id}",
+            width="stretch",
+        ):
+            st.session_state[panel_key] = False
+            st.rerun()
+
+        render_visit_enhancements_panel(
+            visit_id,
+            show_summary=True,
+            show_blocks=True,
+            read_only=True,
+        )
 
 
 def _render_fill_tab(visits: dict):
@@ -1701,6 +1785,8 @@ def _render_fill_tab(visits: dict):
         _render_equipamentos_step(selected_id, visit)
     else:
         _render_caderno_step(selected_id, visit, draft)
+
+    _render_modular_resources(selected_id)
 
     st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
     nav_left, nav_center, nav_right = st.columns([1, 1.4, 1])

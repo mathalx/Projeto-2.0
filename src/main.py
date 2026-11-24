@@ -4,7 +4,8 @@ import os
 import streamlit as st
 
 from src.auth_manager import init_db
-from src.storage_manager import init_storage
+from src.features import initialize_features
+from src.storage_manager import StorageError, init_storage
 from src.ui_components import (
     CLIENTS_TAB_NEW,
     NAV_ITEMS,
@@ -182,8 +183,18 @@ def main():
     st.set_page_config(**PAGE_CONFIG)
 
     # Inicialização única e idempotente do armazenamento local.
-    init_db()
-    init_storage()
+    try:
+        init_db()
+        init_storage()
+        # Carrega o registro central de extensões (temperatura, assinaturas,
+        # equipamentos, fotografias, relatórios e integração) antes das telas.
+        initialize_features()
+    except StorageError as exc:
+        st.error(str(exc))
+        return
+    except Exception:
+        st.error("Não foi possível preparar os dados do sistema. Tente novamente.")
+        return
     apply_global_styles()
 
     # Intenção do usuário para o menu lateral; nunca é sobrescrita em reruns.
@@ -220,7 +231,12 @@ def main():
     render_flash()
 
     renderer = PAGE_RENDERERS.get(current_page, render_main_dashboard)
-    renderer()
+    try:
+        renderer()
+    except StorageError as exc:
+        st.error(str(exc))
+    except Exception:
+        st.error("Não foi possível carregar esta tela. Tente novamente.")
 
 
 if __name__ == "__main__":

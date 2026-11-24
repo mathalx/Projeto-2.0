@@ -1,4 +1,4 @@
-"""Testes espec?ficos para a extens?o modular visit_enhancements (CHANGES 03?09)."""
+"""Testes específicos para a extensão modular visit_enhancements (CHANGES 03–09)."""
 
 import src.storage_manager as sm
 
@@ -14,7 +14,7 @@ def _patch_storage(monkeypatch, tmp_path):
 
 
 def test_equipment_selector_wrappers(tmp_path, monkeypatch):
-    """CHANGE 05: cat?logos/equipamentos reutilizados e validados."""
+    """CHANGE 05: catálogos/equipamentos reutilizados e validados."""
     _patch_storage(monkeypatch, tmp_path)
     from src.features.visit_enhancements.equipment.equipment_selector import (
         EQUIPMENT_CATEGORY,
@@ -72,7 +72,7 @@ def test_temperature_service_wrappers(tmp_path, monkeypatch):
 
 
 def test_signature_service_wrappers(tmp_path, monkeypatch):
-    """CHANGE 04: assinaturas e valida??o."""
+    """CHANGE 04: assinaturas e validação."""
     _patch_storage(monkeypatch, tmp_path)
     from src.features.visit_enhancements.signatures.signature_service import validate_signatures_for_completion
     from src.features.visit_enhancements.integration.visit_integration import finalize_visit_guard
@@ -91,21 +91,21 @@ def test_signature_service_wrappers(tmp_path, monkeypatch):
 
 
 def test_photographs_integration_helpers():
-    """CHANGE 07: helpers de padroniza??o de identifica??o."""
+    """CHANGE 07: helpers de padronização de identificação."""
     from src.features.visit_enhancements.photographs.photo_manager import build_photo_identification
-    assert build_photo_identification("08:30", "Dos?metro 3440") == "08:30 ? Dos?metro 3440"
+    assert build_photo_identification("08:30", "Dosímetro 3440") == "08:30 — Dosímetro 3440"
     assert build_photo_identification("", "Bomba 2386") == "Bomba 2386"
 
 
 def test_reports_wrappers_exist():
-    """CHANGE 08: wrappers de exporta??o reutilizam export_manager."""
+    """CHANGE 08: wrappers de exportação reutilizam export_manager."""
     from src.features.visit_enhancements.reports import report_extensions
     assert callable(getattr(report_extensions, "generate_visit_pdf_bytes", None))
     assert callable(getattr(report_extensions, "generate_visit_excel_bytes", None))
 
 
 def test_integration_package_exposes_blocks():
-    """CHANGE 09/integra??o: pacote modular dispon?vel."""
+    """CHANGE 09/integração: pacote modular disponível."""
     from src.features.visit_enhancements.integration.visit_integration import (
         get_available_enhancement_blocks,
     )
@@ -118,6 +118,29 @@ def test_integration_package_exposes_blocks():
 
 
 def test_visit_form_flow_helpers():
-    """CHANGE 06: fluxo modular dispon?vel."""
+    """CHANGE 06: fluxo modular disponível."""
     from src.features.visit_enhancements.visit_form.visit_form_flow import VISIT_FLOW_STEPS
     assert len(VISIT_FLOW_STEPS) == 4
+
+
+def test_feature_registry_initializes_all_modules():
+    """O registro central usado pelo main carrega todas as extensões."""
+    from src.features import FEATURE_MODULES, available_features, initialize_features
+
+    modules = initialize_features()
+    assert set(modules) == set(FEATURE_MODULES)
+    assert all(module is not None for module in modules.values())
+    assert "integration" in available_features()
+
+
+def test_shared_identification_and_report_wrappers_are_reused_by_views():
+    """As telas consomem os helpers modulares em vez de duplicá-los."""
+    from src.features.visit_enhancements.reports import (
+        generate_visit_pdf_download,
+    )
+    from src.views import photos_view, reports_view
+
+    assert photos_view.build_photo_identification("08:30", "Dosímetro 3440") == (
+        "08:30 — Dosímetro 3440"
+    )
+    assert reports_view.generate_visit_pdf_download is generate_visit_pdf_download

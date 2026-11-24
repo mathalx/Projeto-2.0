@@ -1,11 +1,9 @@
-import os
-
 import streamlit as st
 
-from src.export_manager import (
-    export_clients_to_excel,
-    export_visits_to_excel,
-    generate_pdf_report,
+from src.features.visit_enhancements.reports import (
+    generate_clients_excel_download,
+    generate_visit_pdf_download,
+    generate_visits_excel_download,
 )
 from src.storage_manager import load_clients, load_visits
 from src.ui_components import (
@@ -14,11 +12,6 @@ from src.ui_components import (
     render_section_title,
     status_badge,
 )
-
-
-def _read_file(path: str) -> bytes:
-    with open(path, "rb") as file:
-        return file.read()
 
 
 def render_reports_view():
@@ -66,15 +59,12 @@ def render_reports_view():
             if st.button("🚀 Gerar relatório PDF", key="generate_pdf", type="primary", width="stretch"):
                 with st.spinner("Gerando relatório..."):
                     try:
-                        pdf_path = generate_pdf_report(selected_v_id)
+                        pdf_download = generate_visit_pdf_download(selected_v_id)
                     except Exception:
-                        pdf_path = None
+                        pdf_download = None
 
-                if pdf_path and os.path.exists(pdf_path):
-                    st.session_state["pdf_download"] = {
-                        "data": _read_file(pdf_path),
-                        "name": os.path.basename(pdf_path),
-                    }
+                if pdf_download:
+                    st.session_state["pdf_download"] = pdf_download
                     st.toast("Relatório PDF gerado com sucesso!")
                 else:
                     st.session_state.pop("pdf_download", None)
@@ -87,7 +77,7 @@ def render_reports_view():
                     label="📥 Baixar arquivo PDF",
                     data=pdf_download["data"],
                     file_name=pdf_download["name"],
-                    mime="application/pdf",
+                    mime=pdf_download.get("mime", "application/pdf"),
                     width="stretch",
                 )
 
@@ -109,14 +99,11 @@ def render_reports_view():
             if st.button("📊 Gerar planilha de clientes", key="export_clients", width="stretch"):
                 with st.spinner("Gerando planilha de clientes..."):
                     try:
-                        excel_path = export_clients_to_excel()
+                        clients_download = generate_clients_excel_download()
                     except Exception:
-                        excel_path = None
-                if excel_path and os.path.exists(excel_path):
-                    st.session_state["excel_clients"] = {
-                        "data": _read_file(excel_path),
-                        "name": os.path.basename(excel_path),
-                    }
+                        clients_download = None
+                if clients_download:
+                    st.session_state["excel_clients"] = clients_download
                     st.toast("Planilha de clientes gerada com sucesso!")
                 else:
                     st.session_state.pop("excel_clients", None)
@@ -128,7 +115,7 @@ def render_reports_view():
                     label="📥 Baixar Excel de clientes",
                     data=excel_clients["data"],
                     file_name=excel_clients["name"],
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    mime=excel_clients.get("mime", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
                     width="stretch",
                 )
 
@@ -138,14 +125,11 @@ def render_reports_view():
             if st.button("📊 Gerar planilha de visitas", key="export_visits", width="stretch"):
                 with st.spinner("Gerando planilha de visitas..."):
                     try:
-                        excel_path = export_visits_to_excel()
+                        visits_download = generate_visits_excel_download()
                     except Exception:
-                        excel_path = None
-                if excel_path and os.path.exists(excel_path):
-                    st.session_state["excel_visits"] = {
-                        "data": _read_file(excel_path),
-                        "name": os.path.basename(excel_path),
-                    }
+                        visits_download = None
+                if visits_download:
+                    st.session_state["excel_visits"] = visits_download
                     st.toast("Planilha de visitas gerada com sucesso!")
                 else:
                     st.session_state.pop("excel_visits", None)
@@ -157,6 +141,6 @@ def render_reports_view():
                     label="📥 Baixar Excel de visitas",
                     data=excel_visits["data"],
                     file_name=excel_visits["name"],
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    mime=excel_visits.get("mime", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
                     width="stretch",
                 )
